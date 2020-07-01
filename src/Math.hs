@@ -16,3 +16,9 @@ infixl 5 ^*
 
 toVertex :: Vector2d -> Vertex2 Float
 toVertex (Vector2d a b) = Vertex2 (a :: GLfloat) (b :: GLfloat)
+
+type Vertices = [Vector2d]
+
+type Position = Vector2d
+
+type Direction = Vector2d

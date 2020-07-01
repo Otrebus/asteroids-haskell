@@ -11,12 +11,6 @@ import Control.Monad.State (State, put, execState, get)
 import Debug.Trace
 
 
-type Vertices = [Vector2d]
-
-type Position = Vector2d
-
-type Direction = Vector2d
-
 data Object = Object Vertices Direction Position
 
 
@@ -37,7 +31,7 @@ initialize title = do
   if not successfulInit then exitFailure else do
       GLFW.windowHint $ GLFW.WindowHint'OpenGLDebugContext True
       GLFW.windowHint $ GLFW.WindowHint'DepthBits 16
-      mw <- GLFW.createWindow 320 320 title Nothing Nothing
+      mw <- GLFW.createWindow 480 480 title Nothing Nothing
       case mw of
           Nothing -> GLFW.terminate >> exitFailure
           Just window -> do
@@ -50,27 +44,29 @@ runFrame :: Double -> State GameState Int
 runFrame time = do
     ps <- get
     case ps of
-        GameState (PlayerState [Accelerating]) c -> do
-            put (GameState (PlayerState [Accelerating]) (c+1))
+        GameState (PlayerState [Accelerating] pos) c -> do
+            put (GameState (PlayerState [Accelerating] pos) (c+1))
             return (c+1)
         otherwise -> return 0
 
 
-mainLoop :: IO () -> GLFW.Window -> GameState -> IO ()
+mainLoop :: (GameState -> IO ()) -> GLFW.Window -> GameState -> IO ()
 mainLoop draw w state = do
     time <- GLFW.getTime
     close <- GLFW.windowShouldClose w
     unless close $ do
-        draw
+        draw state
         GLFW.swapBuffers w
         GLFW.pollEvents
         time2 <- GLFW.getTime
         let spf = (-) <$> time2 <*> time
 
         print $ count state
+        b <- GLFW.getKey w GLFW.Key'B
+        print b
 
         case state of
-            GameState (PlayerState _) b -> print b
+            GameState (PlayerState _ _) b -> print b
 
         case spf of
             Nothing -> mainLoop draw w state
@@ -78,7 +74,7 @@ mainLoop draw w state = do
                             newState = (execState (runFrame spf) state)
 
 
-player = Object [Vector2d (-0.04) (-0.04), Vector2d 0 0.04, Vector2d 0.04 (-0.04)] (Vector2d 0.5 0.868) (Vector2d 0.5 0.5)
+playerModel = [Vector2d (-0.04) (-0.04), Vector2d 0 0.04, Vector2d 0.04 (-0.04)]
 
 
 repeatTwice :: [a] -> [a]
@@ -96,21 +92,19 @@ drawObject (Object vertices dir pos) = do
 
     let y = map (toVertex . (pos ^+) . ((^*) mat)) vertices
 
-    renderPrimitive Lines $ do
-        mapM vertex $ repeatTwice y
+    renderPrimitive Lines $ do mapM_ vertex (repeatTwice y)
     return () where
         (Vector2d a b) = dir
 
 
-draw :: IO ()
-draw = do
+draw :: GameState -> IO ()
+draw (GameState (PlayerState _ playerPos) _) = do
     clear [ColorBuffer]
-    drawObject player
+    drawObject (Object playerModel (Vector2d 0.5 0.868) playerPos)
 
 
 someFunc :: IO ()
 someFunc = do
     window <- initialize "Asteroids"
-    mainLoop draw window (GameState (PlayerState [Accelerating]) 0)
+    mainLoop draw window (GameState (PlayerState [Accelerating] (Vector2d 0 0)) 0)
     return ()
- 
