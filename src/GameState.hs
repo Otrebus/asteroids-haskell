@@ -1,11 +1,12 @@
 module GameState (GameState (..), PlayerState (..), Action (..)) where
 import Math
 
-data Action = Accelerating | Breaking | TurningLeft | TurningRight | Shooting
+data Action = Accelerating | Decelerating | TurningLeft | TurningRight deriving (Show, Eq)
 
 data PlayerState = PlayerState {
-    actions :: [Action],
-    position :: Position
+    position :: Position,
+    direction :: Direction,
+    speed :: Velocity
 }
 
 data GameState = GameState {

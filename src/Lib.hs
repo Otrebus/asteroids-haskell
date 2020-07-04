@@ -14,6 +14,11 @@ import Debug.Trace
 data Object = Object Vertices Direction Position
 
 
+turnRate = 2.85 -- radians per second
+accRate = 0.01 -- screens per second per second
+idMatrix = Matrix2d 1.0 0.0 0.0 1.0
+
+
 -- type ErrorCallback = Error -> String -> IO ()
 errorCallback :: GLFW.ErrorCallback
 errorCallback _ = hPutStrLn stderr
@@ -40,14 +45,41 @@ initialize title = do
               return window
 
 
-runFrame :: Double -> State GameState Int
-runFrame time = do
-    ps <- get
-    case ps of
-        GameState (PlayerState [Accelerating] pos) c -> do
-            put (GameState (PlayerState [Accelerating] pos) (c+1))
-            return (c+1)
-        otherwise -> return 0
+keyToAction :: GLFW.Key -> Action
+keyToAction key
+    | key == GLFW.Key'E = Accelerating
+
+
+getTurnMatrix :: Float -> Action -> Matrix2d
+getTurnMatrix theta TurningLeft = Matrix2d (cos theta) (-sin(theta)) (sin theta) (cos theta)
+getTurnMatrix theta TurningRight =  Matrix2d (cos theta) (sin(theta)) (-sin theta) (cos theta)
+getTurnMatrix _ _ = idMatrix
+
+runFrame :: Float -> [Action] -> State GameState Int
+runFrame time acts = do
+    state <- get
+
+    let GameState (PlayerState pos dir vel) count = state
+
+    let theta = turnRate * time
+
+    let turnMatrix = foldr (\a m -> (getTurnMatrix theta a) #*# m) idMatrix acts
+    let newVel = if Accelerating `elem` acts then (vel ^+^ (time * accRate)!*^dir ) else vel
+
+    let newPos = pos ^+^ newVel
+
+    put $ (GameState (PlayerState newPos (turnMatrix #*^ dir) newVel) (count+1))
+    return 0
+
+
+isPressed window key = do
+    a <- GLFW.getKey window key 
+    return (a == GLFW.KeyState'Pressed)
+
+
+keyCommands = [(GLFW.Key'E, Accelerating), (GLFW.Key'S, TurningLeft), (GLFW.Key'D, Decelerating), (GLFW.Key'F, TurningRight)]
+
+getInput window = map snd <$> (filterM ((isPressed window) . fst) keyCommands)
 
 
 mainLoop :: (GameState -> IO ()) -> GLFW.Window -> GameState -> IO ()
@@ -56,22 +88,18 @@ mainLoop draw w state = do
     close <- GLFW.windowShouldClose w
     unless close $ do
         draw state
+
         GLFW.swapBuffers w
         GLFW.pollEvents
         time2 <- GLFW.getTime
         let spf = (-) <$> time2 <*> time
 
-        print $ count state
-        b <- GLFW.getKey w GLFW.Key'B
-        print b
-
-        case state of
-            GameState (PlayerState _ _) b -> print b
+        input <- getInput w
 
         case spf of
             Nothing -> mainLoop draw w state
             Just spf -> mainLoop draw w newState where
-                            newState = (execState (runFrame spf) state)
+                newState = (execState (runFrame (realToFrac spf) input) state)
 
 
 playerModel = [Vector2d (-0.04) (-0.04), Vector2d 0 0.04, Vector2d 0.04 (-0.04)]
@@ -90,7 +118,7 @@ drawObject (Object vertices dir pos) = do
 
     let mat = Matrix2d b a (-a) b
 
-    let y = map (toVertex . (pos ^+) . ((^*) mat)) vertices
+    let y = map (toVertex . (pos ^+^) . ((#*^) mat)) vertices
 
     renderPrimitive Lines $ do mapM_ vertex (repeatTwice y)
     return () where
@@ -98,13 +126,13 @@ drawObject (Object vertices dir pos) = do
 
 
 draw :: GameState -> IO ()
-draw (GameState (PlayerState _ playerPos) _) = do
+draw (GameState playerState _) = do
     clear [ColorBuffer]
-    drawObject (Object playerModel (Vector2d 0.5 0.868) playerPos)
+    drawObject (Object playerModel (direction playerState) (position playerState))
 
 
 someFunc :: IO ()
 someFunc = do
     window <- initialize "Asteroids"
-    mainLoop draw window (GameState (PlayerState [Accelerating] (Vector2d 0 0)) 0)
+    mainLoop draw window (GameState (PlayerState (Vector2d 0 0) (Vector2d 0 1.0) (Vector2d 0.0 0.0)) 0)
     return ()
