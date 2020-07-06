@@ -68,29 +68,33 @@ addEngineParticle :: Float -> Thruster -> Float -> Vector2d -> Vector2d -> Vecto
 addEngineParticle time thruster speed playerPos playerDir playerVel  = do
     let newPos = rebase playerDir (t_position thruster)
     let newDir = rebase playerDir (t_direction thruster)
+    r <- rndFloat 0.0 0.2
+    q <- rndFloat 0.0 0.2
     f <- rndFloat (-0.2) 0.2
     let newnDir = rotate f newDir
     state <- get
-    put (state { gs_particles = ((Particle (playerPos ^+^ newPos) (playerVel ^+^ ((newnDir)^*!speed)) (time + 1.5) 0.5)):(gs_particles state) } )
+    put (state { gs_particles = ((Particle (playerPos ^+^ newPos) (playerVel ^+^ ((newnDir)^*!speed)) (time + 2.5 + 0.2) (0.3 + q))):(gs_particles state) } )
 
 
 addEngineParticles :: [Action] -> State GameState ()
 addEngineParticles actions = do
-
+    
     state <- get
-    let GameState (PlayerState pos dir vel thrusters) particles _ time rng = state
+    let GameState (PlayerState pos dir vel (Thrusters ma re tl tr bl br)) particles _ time rng = state
 
-    when (Accelerating `elem` actions && ((t_nextEmitted . e_main) thrusters < time)) $ do
+    when (Accelerating `elem` actions && t_nextEmitted ma < time) $ do
         addEngineParticle time mainThruster 0.6 pos dir vel
+        state2 <- get
+        let GameState (PlayerState pos dir vel thrusters2@(Thrusters ma2 re2 tl2 tr2 bl2 br2)) particles _ time rng = state
+        put (state2 { gs_playerState = (gs_playerState state2) { ps_thrusters = thrusters2 { e_main = ma2 { t_nextEmitted = ((t_nextEmitted ma) + 0.10)} } }  })
 
-    when (TurningRight `elem` actions && ((t_nextEmitted . e_main) thrusters < time)) $ do
-        addEngineParticle time topLeftThruster 0.6 pos dir vel
-        addEngineParticle time bottomRightThruster 0.6 pos dir vel
+    -- when (TurningRight `elem` actions && ((t_nextEmitted . e_topleft) thrusters < time)) $ do
+    --     addEngineParticle time topLeftThruster 0.6 pos dir vel
+    --     addEngineParticle time bottomRightThruster 0.6 pos dir vel
 
-    when (TurningLeft `elem` actions && ((t_nextEmitted . e_main) thrusters < time)) $ do
-        addEngineParticle time topRightThruster 0.6 pos dir vel
-        addEngineParticle time bottomLeftThruster 0.6 pos dir vel    
-
+    -- when (TurningLeft `elem` actions && ((t_nextEmitted . e_main) thrusters < time)) $ do
+    --     addEngineParticle time topRightThruster 0.6 pos dir vel
+    --     addEngineParticle time bottomLeftThruster 0.6 pos dir vel    
 
 
 getTurnMatrix :: Float -> Action -> Matrix2d
@@ -113,7 +117,6 @@ updateParticles :: Float -> Float -> [Particle] -> [Particle]
 updateParticles time deltaT = filter ((>time) . p_lifeTime) . map (\(Particle pos vel life bri) -> (Particle (pos ^+^ deltaT!*^vel) vel life bri))
 
 
-
 runFrame :: Float -> [Action] -> State GameState Int
 runFrame delta actions = do
     state <- get
@@ -131,7 +134,7 @@ runFrame delta actions = do
 
     state <- get
     let newParticles = updateParticles time delta (gs_particles state)
-    put $ state { gs_playerState = playerState { ps_position = newPos, ps_direction = (turnMatrix #*^ dir), ps_velocity = newVel }, gs_time = time, gs_count = count+1, gs_particles = newParticles }
+    put $ state { gs_playerState = (gs_playerState state) { ps_position = newPos, ps_direction = (turnMatrix #*^ dir), ps_velocity = newVel }, gs_time = time, gs_count = count+1, gs_particles = newParticles }
     return 0
 
 
