@@ -3,7 +3,7 @@ module Lib (someFunc) where
 import Debug.Trace
 import System.IO (hPutStrLn, stderr)
 import Control.Monad
-import Graphics.Rendering.OpenGL as GL hiding (Position, get, rotate)
+import qualified Graphics.Rendering.OpenGL as GL hiding (get, rotate)
 import qualified Graphics.UI.GLFW as GLFW
 import Graphics.Rendering.OpenGL (vertex, clear, ClearBuffer(ColorBuffer), renderPrimitive, PrimitiveMode(Lines, Points))
 import Player
@@ -31,20 +31,29 @@ keyCallback :: GLFW.KeyCallback
 keyCallback window key _ action _ = when (key == GLFW.Key'Escape && action == GLFW.KeyState'Pressed) $ GLFW.setWindowShouldClose window True
 
 
+resizeWindow :: GLFW.WindowSizeCallback
+resizeWindow win w h =
+    do
+      GL.viewport   GL.$= (GL.Position 0 0, GL.Size (fromIntegral w) (fromIntegral h))
+
+
 initialize :: String -> IO GLFW.Window
 initialize title = do
   GLFW.setErrorCallback (Just errorCallback)
+  
   successfulInit <- GLFW.init
-  -- if init failed, we exit the program
+
   if not successfulInit then exitFailure else do
       GLFW.windowHint $ GLFW.WindowHint'OpenGLDebugContext True
       GLFW.windowHint $ GLFW.WindowHint'DepthBits 16
       mw <- GLFW.createWindow 480 480 title Nothing Nothing
+      
       case mw of
           Nothing -> GLFW.terminate >> exitFailure
           Just window -> do
               GLFW.makeContextCurrent mw
               GLFW.setKeyCallback window (Just keyCallback)
+              GLFW.setWindowSizeCallback window (Just resizeWindow)
               return window
 
 
@@ -80,13 +89,14 @@ addEngineParticles :: [Action] -> State GameState ()
 addEngineParticles actions = do
     
     state <- get
-    let GameState (PlayerState pos dir vel (Thrusters ma re tl tr bl br)) particles _ time rng = state
+    let GameState (PlayerState pos dir vel (Thrusters ma re tl tr bl br)) particles time rng = state
 
     when (Accelerating `elem` actions && t_nextEmitted ma < time) $ do
         addEngineParticle time mainThruster 0.6 pos dir vel
         state2 <- get
-        let GameState (PlayerState pos dir vel thrusters2@(Thrusters ma2 re2 tl2 tr2 bl2 br2)) particles _ time rng = state
-        put (state2 { gs_playerState = (gs_playerState state2) { ps_thrusters = thrusters2 { e_main = ma2 { t_nextEmitted = ((t_nextEmitted ma) + 0.10)} } }  })
+        --let GameState (PlayerState pos dir vel thrusters2@(Thrusters ma2 re2 tl2 tr2 bl2 br2)) particles _ time rng = state
+        put $ ((onPlayerState . onThrusters . onMainThruster) (\t -> t { t_nextEmitted = (time + 0.01) } )) state2
+        -- put (state2 { gs_playerState = (gs_playerState state2) { ps_thrusters = thrusters2 { e_main = ma2 { t_nextEmitted = ((t_nextEmitted ma) + 0.10)} } }  })
 
     -- when (TurningRight `elem` actions && ((t_nextEmitted . e_topleft) thrusters < time)) $ do
     --     addEngineParticle time topLeftThruster 0.6 pos dir vel
@@ -95,7 +105,6 @@ addEngineParticles actions = do
     -- when (TurningLeft `elem` actions && ((t_nextEmitted . e_main) thrusters < time)) $ do
     --     addEngineParticle time topRightThruster 0.6 pos dir vel
     --     addEngineParticle time bottomLeftThruster 0.6 pos dir vel    
-
 
 getTurnMatrix :: Float -> Action -> Matrix2d
 getTurnMatrix theta TurningLeft = Matrix2d (cos theta) (-sin(theta)) (sin theta) (cos theta)
@@ -109,7 +118,7 @@ drawParticles particles = do
     renderPrimitive Points $ forM_ particles renderParticle where
         renderParticle p = do
             let d = p_brightness p
-            GL.color $ GL.Color4 d d d (d :: GLfloat)
+            GL.color $ GL.Color4 d d d (d :: GL.GLfloat)
             vertex ((toVertex . p_position) p)
 
 
@@ -121,7 +130,7 @@ runFrame :: Float -> [Action] -> State GameState Int
 runFrame delta actions = do
     state <- get
 
-    let GameState (playerState@(PlayerState pos dir vel thrusters)) particles count time rng = state
+    let GameState (playerState@(PlayerState pos dir vel thrusters)) particles time rng = state
 
     let theta = turnRate * delta
 
@@ -134,7 +143,7 @@ runFrame delta actions = do
 
     state <- get
     let newParticles = updateParticles time delta (gs_particles state)
-    put $ state { gs_playerState = (gs_playerState state) { ps_position = newPos, ps_direction = (turnMatrix #*^ dir), ps_velocity = newVel }, gs_time = time, gs_count = count+1, gs_particles = newParticles }
+    put $ state { gs_playerState = (gs_playerState state) { ps_position = newPos, ps_direction = (turnMatrix #*^ dir), ps_velocity = newVel }, gs_time = time, gs_particles = newParticles }
     return 0
 
 
@@ -152,11 +161,9 @@ mainLoop :: (GameState -> IO ()) -> GLFW.Window -> GameState -> IO ()
 mainLoop draw w state = do
     close <- GLFW.windowShouldClose w
     let prevTime = gs_time state
-    let blah = gs_count state
 
     unless close $ do
         draw state
-
         GLFW.swapBuffers w
         GLFW.pollEvents
         input <- getInput w
@@ -185,14 +192,14 @@ drawObject (Object vertices dir pos) = do
 
     let y = map (toVertex . (pos ^+^) . ((#*^) mat)) vertices
 
-    GL.color $ GL.Color4 1 1 1 (1 :: GLfloat)
+    GL.color $ GL.Color4 1 1 1 (1 :: GL.GLfloat)
     renderPrimitive Lines $ do mapM_ vertex (repeatTwice y)
     return () where
         (Vector2d a b) = dir
 
 
 draw :: GameState -> IO ()
-draw (GameState playerState particles _ _ _) = do
+draw (GameState playerState particles _ _) = do
     clear [ColorBuffer]
     drawObject (Object playerModel (ps_direction playerState) (ps_position playerState))
     drawParticles particles
@@ -205,7 +212,7 @@ someFunc = do
     rng <- newStdGen
     case time of
         Just t ->
-            mainLoop draw window (GameState (PlayerState startPos startDir startVel thrusters) [] 0 (realToFrac t) rng)
+            mainLoop draw window (GameState (PlayerState startPos startDir startVel thrusters) [] (realToFrac t) rng)
         Nothing ->
             return ()
     return ()

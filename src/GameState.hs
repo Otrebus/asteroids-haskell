@@ -1,6 +1,15 @@
 
 
-module GameState (GameState (..), PlayerState (..), Action (..), Thrusters(..), Thruster(..), Particle(..)) where
+module GameState (
+    GameState (..),
+    PlayerState (..),
+    Action (..),
+    Thrusters(..),
+    Thruster(..),
+    Particle(..),
+    onThrusters,
+    onPlayerState,
+    onMainThruster) where
 import Math
 import System.Random
 
@@ -38,7 +47,23 @@ data Particle = Particle {
 data GameState = GameState {
     gs_playerState :: PlayerState,
     gs_particles :: [Particle],
-    gs_count :: Int,
     gs_time :: Float,
     gs_rng :: StdGen
 }
+
+type Unop a = a -> a
+
+type Lifter p q = Unop p -> Unop q
+
+-- onNextEmitted :: Lifter Float Thrusters
+-- onNextEmitted f th = th { t_nextEmitted = f (t_nextEmitted th) }
+
+onMainThruster :: Lifter Thruster Thrusters
+onMainThruster f t = t { e_main = f (e_main t) }
+
+onThrusters :: Lifter Thrusters PlayerState
+onThrusters f ps = ps { ps_thrusters = f (ps_thrusters ps) }
+
+onPlayerState :: Lifter PlayerState GameState
+onPlayerState f gs = gs { gs_playerState = f (gs_playerState gs) }
+
