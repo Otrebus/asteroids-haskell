@@ -79,32 +79,43 @@ addEngineParticle time thruster speed playerPos playerDir playerVel  = do
     let newDir = rebase playerDir (t_direction thruster)
     r <- rndFloat 0.0 0.2
     q <- rndFloat 0.0 0.2
-    f <- rndFloat (-0.2) 0.2
-    let newnDir = rotate f newDir
-    state <- get
-    put (state { gs_particles = ((Particle (playerPos ^+^ newPos) (playerVel ^+^ ((newnDir)^*!speed)) (time + 2.5 + 0.2) (0.3 + q))):(gs_particles state) } )
-
-
-addEngineParticles :: [Action] -> State GameState ()
-addEngineParticles actions = do
     
+    x <- rndFloat (-1) 1
+    y <- liftM (**1.1) (rndFloat 0 0.3)
+    
+    s <- rndFloat 0.0 0.15
+    let newnDir = rotate (x*y) newDir
     state <- get
-    let GameState (PlayerState pos dir vel (Thrusters ma re tl tr bl br)) particles time rng = state
+    put (state { gs_particles = ((Particle (playerPos ^+^ newPos) (playerVel ^+^ ((newnDir)^*!(speed + s))) time (time + 2.5 + 0.2) (0.5 + q))):(gs_particles state) } )
 
-    when (Accelerating `elem` actions && t_nextEmitted ma < time) $ do
-        addEngineParticle time mainThruster 0.6 pos dir vel
-        state2 <- get
-        --let GameState (PlayerState pos dir vel thrusters2@(Thrusters ma2 re2 tl2 tr2 bl2 br2)) particles _ time rng = state
-        put $ ((onPlayerState . onThrusters . onMainThruster) (\t -> t { t_nextEmitted = (time + 0.01) } )) state2
-        -- put (state2 { gs_playerState = (gs_playerState state2) { ps_thrusters = thrusters2 { e_main = ma2 { t_nextEmitted = ((t_nextEmitted ma) + 0.10)} } }  })
 
-    -- when (TurningRight `elem` actions && ((t_nextEmitted . e_topleft) thrusters < time)) $ do
-    --     addEngineParticle time topLeftThruster 0.6 pos dir vel
-    --     addEngineParticle time bottomRightThruster 0.6 pos dir vel
+addEngineParticles pos dir vel action actions thrusterGetter fp start current time = do
+    state <- get
+    let nextParticleTime = current + (t_emissionInterval (thrusterGetter state))
+    when (action `elem` actions && nextParticleTime < time) $ do
+        addEngineParticle nextParticleTime (thrusterGetter state) 0.6 (pos ^+^ (vel ^*! (nextParticleTime-start))) dir vel
+        state <- get
+        put $ ((onPlayerState . onThrusters . fp) (\t -> t { t_lastEmitted = nextParticleTime } )) state
+        addEngineParticles pos dir vel action actions thrusterGetter fp start nextParticleTime time
 
-    -- when (TurningLeft `elem` actions && ((t_nextEmitted . e_main) thrusters < time)) $ do
-    --     addEngineParticle time topRightThruster 0.6 pos dir vel
-    --     addEngineParticle time bottomLeftThruster 0.6 pos dir vel    
+
+addEnginesParticles :: [Action] -> State GameState ()
+addEnginesParticles actions = do
+
+    gs@(GameState (PlayerState pos dir vel _) _ time prevTime _) <- get
+
+    let thfun = (ps_thrusters . gs_playerState)
+    let engines = [(Accelerating, e_main . thfun, onMainThruster),
+                   (TurningLeft, e_topright . thfun, onTopRightThruster),
+                   (TurningRight, e_topleft . thfun, onTopLeftThruster),
+                   (TurningLeft, e_bottomleft . thfun, onBottomLeftThruster),
+                   (TurningRight, e_bottomright . thfun, onBottomRightThruster)]
+
+    forM_ engines $ \(ac, th, fp) -> do
+        let t0 = t_lastEmitted (th gs); int = t_emissionInterval (th gs)
+        let t = t0 + int * realToFrac (floor ((prevTime - t0)/int))
+        addEngineParticles pos dir vel ac actions th fp t t time
+
 
 getTurnMatrix :: Float -> Action -> Matrix2d
 getTurnMatrix theta TurningLeft = Matrix2d (cos theta) (-sin(theta)) (sin theta) (cos theta)
@@ -123,23 +134,22 @@ drawParticles particles = do
 
 
 updateParticles :: Float -> Float -> [Particle] -> [Particle]
-updateParticles time deltaT = filter ((>time) . p_lifeTime) . map (\(Particle pos vel life bri) -> (Particle (pos ^+^ deltaT!*^vel) vel life bri))
+updateParticles time deltaT = filter ((>time) . p_lifeTime) . map (\(Particle pos vel start life bri) -> (Particle (pos ^+^ (min (time-start) deltaT)!*^vel) vel start life ((bri*(life-time)/(life-start))**0.85)))
 
 
-runFrame :: Float -> [Action] -> State GameState Int
-runFrame delta actions = do
+runFrame :: [Action] -> State GameState Int
+runFrame actions = do
     state <- get
 
-    let GameState (playerState@(PlayerState pos dir vel thrusters)) particles time rng = state
-
+    let GameState (playerState@(PlayerState pos dir vel thrusters)) particles time prevTime rng = state
+    let delta = time - prevTime
     let theta = turnRate * delta
 
     let turnMatrix = foldr (\a m -> (getTurnMatrix theta a) #*# m) idMatrix actions
     let newVel = if Accelerating `elem` actions then (vel ^+^ (delta * accRate)!*^dir ) else vel
+    let newPos = pos ^+^ (delta!*^vel)
 
-    let newPos = pos ^+^ (delta!*^newVel)
-
-    addEngineParticles actions
+    addEnginesParticles actions
 
     state <- get
     let newParticles = updateParticles time delta (gs_particles state)
@@ -163,17 +173,16 @@ mainLoop draw w state = do
     let prevTime = gs_time state
 
     unless close $ do
+        newTime <- GLFW.getTime
         draw state
         GLFW.swapBuffers w
         GLFW.pollEvents
         input <- getInput w
-        newTime <- GLFW.getTime
 
         case newTime of
             Nothing -> mainLoop draw w state
             Just time -> mainLoop draw w newState where
-                newState = (execState (runFrame deltaTime input) state { gs_time = ftime })
-                deltaTime = (ftime - prevTime)
+                newState = (execState (runFrame input) state { gs_time = ftime, gs_prevTime = prevTime })
                 ftime = realToFrac time
 
 
@@ -199,7 +208,7 @@ drawObject (Object vertices dir pos) = do
 
 
 draw :: GameState -> IO ()
-draw (GameState playerState particles _ _) = do
+draw (GameState playerState particles _ _ _) = do
     clear [ColorBuffer]
     drawObject (Object playerModel (ps_direction playerState) (ps_position playerState))
     drawParticles particles
@@ -212,7 +221,7 @@ someFunc = do
     rng <- newStdGen
     case time of
         Just t ->
-            mainLoop draw window (GameState (PlayerState startPos startDir startVel thrusters) [] (realToFrac t) rng)
+            mainLoop draw window (GameState (PlayerState startPos startDir startVel thrusters) [] (realToFrac t) (realToFrac t) rng)
         Nothing ->
             return ()
     return ()

@@ -43,3 +43,5 @@ type Position = Vector2d
 type Direction = Vector2d
 
 type Velocity = Vector2d
+
+type Time =  Float

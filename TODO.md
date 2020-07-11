@@ -1,5 +1,4 @@
-* Particle effects to accelerating/turning
-    - Use nextEmitted property
+* Interframe particle effects 
 * Add Velocity vector instead of Vector2d
 * Check speed diff. equations
 * Fuel consumption
