@@ -1,5 +1,3 @@
-
-
 module GameState (
     GameState (..),
     PlayerState (..),
@@ -7,24 +5,35 @@ module GameState (
     Thrusters(..),
     Thruster(..),
     Particle(..),
+    Bullet(..),
     onThrusters,
     onPlayerState,
+    onPlayerPos,
     onMainThruster,
     onTopLeftThruster,
     onTopRightThruster,
     onBottomLeftThruster,
-    onBottomRightThruster) where
+    onBottomRightThruster,
+    onParticles) where
 import Math
 import System.Random
 
-data Action = Accelerating | Decelerating | TurningLeft | TurningRight deriving (Show, Eq)
+data Action = Shooting | Accelerating | Decelerating | TurningLeft | TurningRight deriving (Show, Eq)
 
 data PlayerState = PlayerState {
     ps_position :: Position,
     ps_direction :: Direction,
     ps_velocity :: Velocity,
-    ps_thrusters :: Thrusters
-}
+    ps_thrusters :: Thrusters,
+    ps_lastBullet :: Time
+} deriving (Show)
+
+
+data Bullet = Bullet {
+    b_position :: Position,
+    b_velocity :: Velocity,
+    b_lifeTime :: Float
+} deriving (Show)
 
 data Thrusters = Thrusters {
     e_main :: Thruster,
@@ -33,14 +42,16 @@ data Thrusters = Thrusters {
     e_topright :: Thruster,
     e_bottomleft :: Thruster,
     e_bottomright :: Thruster
-}
+} deriving (Show)
+
 
 data Thruster = Thruster {
     t_lastEmitted :: Float,
     t_emissionInterval :: Float,
     t_position :: Vector2d,
     t_direction :: Vector2d
-}
+} deriving (Show)
+
 
 data Particle = Particle {
     p_position :: Position,
@@ -50,20 +61,20 @@ data Particle = Particle {
     p_brightness :: Float
 } deriving (Show)
 
+
 data GameState = GameState {
     gs_playerState :: PlayerState,
     gs_particles :: [Particle],
+    gs_bullets :: [Bullet],
     gs_time :: Float,
     gs_prevTime :: Float,
     gs_rng :: StdGen
-}
+} deriving (Show)
+
 
 type Unop a = a -> a
 
 type Lifter p q = Unop p -> Unop q
-
--- onNextEmitted :: Lifter Float Thrusters
--- onNextEmitted f th = th { t_nextEmitted = f (t_nextEmitted th) }
 
 onMainThruster :: Lifter Thruster Thrusters
 onMainThruster f t = t { e_main = f (e_main t) }
@@ -86,3 +97,8 @@ onThrusters f ps = ps { ps_thrusters = f (ps_thrusters ps) }
 onPlayerState :: Lifter PlayerState GameState
 onPlayerState f gs = gs { gs_playerState = f (gs_playerState gs) }
 
+onPlayerPos :: Lifter Position PlayerState
+onPlayerPos f ps = ps { ps_position = f (ps_position ps) }
+
+onParticles :: Lifter [Particle] GameState
+onParticles f gs = gs { gs_particles = f (gs_particles gs) }

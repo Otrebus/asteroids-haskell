@@ -2,25 +2,23 @@ module Player where
 import Math
 import GameState
 
+plBl = Vector2d (-0.04) (-0.04) -- Bottom left corner
+plT = Vector2d 0 0.04           -- Top corner
+plBr = Vector2d 0.04 (-0.04)    -- Bottom right corner
 
-bottomLeftCorner = Vector2d (-0.04) (-0.04)
-topCorner = Vector2d 0 0.04
-bottomRightCorner = Vector2d 0.04 (-0.04)
 
-
-playerModel = [bottomLeftCorner, topCorner, bottomRightCorner]
-
+playerModel = [plBl, plT, plBr]
 
 interpolate :: Vector2d -> Vector2d -> Float -> Vector2d
 interpolate vec1 vec2 t = vec1 ^+^ ((vec2 ^-^ vec1) ^*! t)
 
 
-mainThruster = Thruster 0.0 0.001 (interpolate bottomLeftCorner bottomRightCorner 0.5) (Vector2d 0 (-1))
-reverseThruster = Thruster 0.0 0.05 topCorner (Vector2d 0 1)
-topLeftThruster = Thruster 0.0 0.01 (interpolate topCorner bottomLeftCorner 0.2) (Vector2d (-1) 0)
-topRightThruster = Thruster 0.0 0.01 (interpolate topCorner bottomRightCorner 0.2) (Vector2d (1) 0)
-bottomLeftThruster = Thruster 0.0 0.01 (interpolate topCorner bottomLeftCorner 0.8) (Vector2d (-1) 0)
-bottomRightThruster = Thruster 0.0 0.01 (interpolate topCorner bottomRightCorner 0.8) (Vector2d (1) 0)
+mainThruster = Thruster 0.0 0.001 (interpolate plBl plBr 0.5) (Vector2d 0 (-1))
+reverseThruster = Thruster 0.0 0.05 plT (Vector2d 0 1)
+topLeftThruster = Thruster 0.0 0.01 (interpolate plT plBl 0.2) (Vector2d (-1) 0)
+topRightThruster = Thruster 0.0 0.01 (interpolate plT plBr 0.2) (Vector2d (1) 0)
+bottomLeftThruster = Thruster 0.0 0.01 (interpolate plT plBl 0.8) (Vector2d (-1) 0)
+bottomRightThruster = Thruster 0.0 0.01 (interpolate plT plBr 0.8) (Vector2d (1) 0)
 
 
 thrusters = Thrusters mainThruster reverseThruster topLeftThruster topRightThruster bottomLeftThruster bottomRightThruster
@@ -29,3 +27,12 @@ thrusters = Thrusters mainThruster reverseThruster topLeftThruster topRightThrus
 startPos = (Vector2d 0 0)
 startDir = (Vector2d 0 1.0)
 startVel = (Vector2d 0.0 0.0)
+
+
+blL = Vector2d (-0.002) (0.00)
+blR = Vector2d 0.002 0.00
+blT = Vector2d 0.00 0.01
+blB = Vector2d 0 (-0.005)
+
+
+bulletModel = [blL, blT, blR, blB]

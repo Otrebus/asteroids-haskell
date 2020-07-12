@@ -33,6 +33,16 @@ infixl 6 ^*!
 (^*!) :: Vector2d -> Float -> Vector2d
 (^*!) (Vector2d a b) x = Vector2d (x*a) (x*b)
 
+infixl 6 ^/!
+(^/!) :: Vector2d -> Float -> Vector2d
+(^/!) (Vector2d x y) t = Vector2d (x/t) (y/t)
+
+len :: Vector2d -> Float
+len (Vector2d x y) = sqrt (x*x + y*y)
+
+normalize :: Vector2d -> Vector2d
+normalize v = v ^/! (len v)
+
 toVertex :: Vector2d -> Vertex2 Float
 toVertex (Vector2d a b) = Vertex2 (a :: GLfloat) (b :: GLfloat)
 
@@ -44,4 +54,6 @@ type Direction = Vector2d
 
 type Velocity = Vector2d
 
-type Time =  Float
+type Time = Float
+
+type Angle = Float
