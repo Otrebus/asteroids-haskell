@@ -25,6 +25,7 @@ library
       GameState
       Math
       Player
+      Font
   other-modules:
       Paths_asteroids
   hs-source-dirs:

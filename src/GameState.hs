@@ -14,7 +14,8 @@ module GameState (
     onTopRightThruster,
     onBottomLeftThruster,
     onBottomRightThruster,
-    onParticles) where
+    onParticles,
+    onBullets) where
 import Math
 import System.Random
 
@@ -24,6 +25,7 @@ data PlayerState = PlayerState {
     ps_position :: Position,
     ps_direction :: Direction,
     ps_velocity :: Velocity,
+    ps_angularVelocity :: Float,
     ps_thrusters :: Thrusters,
     ps_lastBullet :: Time
 } deriving (Show)
@@ -31,6 +33,7 @@ data PlayerState = PlayerState {
 
 data Bullet = Bullet {
     b_position :: Position,
+    b_direction :: Direction,
     b_velocity :: Velocity,
     b_lifeTime :: Float
 } deriving (Show)
@@ -102,3 +105,6 @@ onPlayerPos f ps = ps { ps_position = f (ps_position ps) }
 
 onParticles :: Lifter [Particle] GameState
 onParticles f gs = gs { gs_particles = f (gs_particles gs) }
+
+onBullets :: Lifter [Bullet] GameState
+onBullets f gs = gs { gs_bullets = f (gs_bullets gs) }
