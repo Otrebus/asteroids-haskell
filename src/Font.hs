@@ -3,8 +3,7 @@ import Math (Vector2d(..), toVertex)
 import qualified Graphics.Rendering.OpenGL as GL
 import Control.Monad
 import Data.Char (ord)
-import Utils
-import Graphics.Rendering.OpenGL (vertex, clear, ClearBuffer(ColorBuffer), renderPrimitive, PrimitiveMode(Lines, Points))
+import Graphics.Rendering.OpenGL (vertex, clear, ClearBuffer(ColorBuffer), renderPrimitive, PrimitiveMode(Lines, Points, LineStrip))
 
 -- Hershey vector font ascii 32 to 126, adapted from the C listing at
 -- https://web.archive.org/web/20191231161857/http://paulbourke.net/dataformats/hershey/
@@ -115,7 +114,7 @@ drawChar size (Vector2d x y) c = do
 
     GL.color $ GL.Color4 1 1 1 (1 :: GL.GLfloat)
     forM_ ws $ \y -> do
-        renderPrimitive Lines $ do mapM_ vertex (repeatTwice y)
+        renderPrimitive LineStrip $ do mapM_ vertex y
 
     return $ Vector2d (x + (size*realToFrac(w))/32.0) y
 

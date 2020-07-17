@@ -5,7 +5,7 @@ import System.IO (hPutStrLn, stderr)
 import Control.Monad
 import qualified Graphics.Rendering.OpenGL as GL hiding (get, rotate)
 import qualified Graphics.UI.GLFW as GLFW
-import Graphics.Rendering.OpenGL (vertex, clear, ClearBuffer(ColorBuffer), renderPrimitive, PrimitiveMode(Lines, Points))
+import Graphics.Rendering.OpenGL (vertex, clear, ClearBuffer(ColorBuffer), renderPrimitive, PrimitiveMode(Lines, Points, QuadStrip, TriangleStrip, LineLoop))
 import Player
 import System.Exit (exitFailure)
 import Data.Fixed (mod')
@@ -14,12 +14,12 @@ import GameState
 import Control.Monad.State (State, put, execState, get)
 import Font (chars)
 import Debug.Trace
+import Control.Monad.Random
 import System.Random
-import Utils
 import Font
 
 
-data Object = Object Vertices Direction Position
+data Object = Object (Vertices, [Vertices]) Direction Position
 
 bulletVel = 0.90 
 fireRate = 0.23 -- bullets per second
@@ -37,9 +37,7 @@ keyCallback window key _ action _ = when (key == GLFW.Key'Escape && action == GL
 
 
 resizeWindow :: GLFW.WindowSizeCallback
-resizeWindow win w h =
-    do
-      GL.viewport GL.$= (GL.Position 0 0, GL.Size (fromIntegral w) (fromIntegral h))
+resizeWindow win w h = GL.viewport GL.$= (GL.Position 0 0, GL.Size (fromIntegral w) (fromIntegral h))
 
 
 initialize :: String -> IO GLFW.Window
@@ -160,6 +158,14 @@ drawParticles particles = do
             vertex ((toVertex . p_position) p)
 
 
+drawPoly :: [Vector2d] -> IO ()
+drawPoly vertices = do
+
+    GL.color $ GL.Color4 1 1 1 (1 :: GL.GLfloat)
+    renderPrimitive LineLoop $ do mapM_ vertex (map toVertex vertices)
+    return ()
+
+
 updateParticles :: Time -> Time -> [Particle] -> [Particle]
 updateParticles time deltaT particles = newParticles
     where
@@ -258,17 +264,22 @@ mainLoop draw w state = do
 
 
 drawObject :: Object -> IO ()
-drawObject (Object vertices dir pos) = do
+drawObject (Object (lineVertices, triangles) dir pos) = do
     let mat = Matrix2d b a (-a) b
-    let y = map (toVertex . (pos ^+^) . ((#*^) mat)) vertices
+    let tris = map (\v -> (map (toVertex . (pos ^+^) . ((#*^) mat)) v)) triangles
+    let y = map (toVertex . (pos ^+^) . ((#*^) mat)) lineVertices
+
+    GL.color $ GL.Color4 0 0 0 (1 :: GL.GLfloat)
+    forM_ tris (\tri -> renderPrimitive TriangleStrip $ (do mapM_ vertex tri))
+
     GL.color $ GL.Color4 1 1 1 (1 :: GL.GLfloat)
-    renderPrimitive Lines $ do mapM_ vertex (repeatTwiceAndLoop y)
+    renderPrimitive LineLoop $ do mapM_ vertex y
     return () where
         (Vector2d a b) = dir
 
 
 drawDuplicates :: Object -> IO ()
-drawDuplicates (Object vectors dir pos) = do
+drawDuplicates (Object (vectors, _) dir pos) = do
     let fx (Vector2d x y) = x; fy (Vector2d x y) = y
 
     let wrap = [(fx, (<), Vector2d 1.0 0.0, maximum), (fx, (>), Vector2d (-1.0) 0.0, minimum),
@@ -279,13 +290,21 @@ drawDuplicates (Object vectors dir pos) = do
             drawObject (Object playerModel dir (pos ^-^ v^*!2))
 
 
+trans t (Object (ls, vs) x y) = Object (map (\(Vector2d x y) -> Vector2d (x + t) (y + t)) ls, map (map (\(Vector2d a b) -> Vector2d (a + t) (b + t))) vs) x y
+
+
 draw :: GameState -> IO ()
 draw (GameState playerState particles bullets _ _ _) = do
     clear [ColorBuffer]
-    drawObject (Object playerModel (ps_direction playerState) (ps_position playerState))
+    drawText ("Number of particles: " ++ (show (length particles))) 0.1 (Vector2d (-0.9) 0.9)
+
+    drawObject $ Object playerModel (ps_direction playerState) (ps_position playerState)
+
     drawParticles particles
 
-    drawText ("Number of particles: " ++ (show (length particles))) 0.1 (Vector2d (-0.9) 0.9)
+    let rng = mkStdGen $ 122 + fromIntegral (toInteger (round((realToFrac (length particles) / 200.0))))
+    let poly = (evalRand (randomPolygon 12) rng)
+    drawPoly poly
 
     forM_ bullets $ \(Bullet pos dir vel _) -> do
         drawObject (Object bulletModel dir pos)
@@ -298,6 +317,7 @@ someFunc = do
     time <- GLFW.getTime
 
     rng <- newStdGen
+
     case time of
         Just t ->
             mainLoop draw window (GameState (PlayerState startPos startDir startVel 0 thrusters 0.0) [] [] (realToFrac t) (realToFrac t) rng)
