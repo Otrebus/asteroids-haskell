@@ -6,7 +6,6 @@ import Control.Monad
 import qualified Graphics.Rendering.OpenGL as GL hiding (get, rotate)
 import qualified Graphics.UI.GLFW as GLFW
 import Graphics.Rendering.OpenGL (vertex, clear, ClearBuffer(ColorBuffer), renderPrimitive, PrimitiveMode(Lines, Points))
-import Data.Char (ord)
 import Player
 import System.Exit (exitFailure)
 import Data.Fixed (mod')
@@ -16,6 +15,8 @@ import Control.Monad.State (State, put, execState, get)
 import Font (chars)
 import Debug.Trace
 import System.Random
+import Utils
+import Font
 
 
 data Object = Object Vertices Direction Position
@@ -150,9 +151,8 @@ getTurnMatrix :: Angle -> Matrix2d
 getTurnMatrix theta = Matrix2d (cos theta) (sin(theta)) (-sin theta) (cos theta)
 
 
-drawParticles :: [Particle] -> IO()
+drawParticles :: [Particle] -> IO ()
 drawParticles particles = do
-
     renderPrimitive Points $ forM_ particles renderParticle where
         renderParticle p = do
             let d = p_brightness p
@@ -161,8 +161,13 @@ drawParticles particles = do
 
 
 updateParticles :: Time -> Time -> [Particle] -> [Particle]
-updateParticles time deltaT = filter ((>time) . p_lifeTime) . map (\(Particle pos vel start life bri) -> (Particle (pos ^+^ (min (time-start) deltaT)!*^vel) vel start life ((bri*(life-time)/(life-start))**0.85)))
-
+updateParticles time deltaT particles = newParticles
+    where
+        filteredParticles = filter ((>time) . p_lifeTime) $ filter ((>0.01) . (p_brightness)) particles
+        newParticles = map (\(Particle pos vel start life bri) -> (
+            let newBri = (bri*(life-time)/(life-start))**0.85
+                newPos = pos ^+^ (min (time-start) deltaT)!*^vel
+            in  Particle newPos vel start life newBri)) filteredParticles
 
 updateBullets :: Time -> Time -> [Bullet] -> [Bullet]
 updateBullets time deltaT = filter ((>time) . b_lifeTime) . map (\(Bullet pos dir vel life) -> (Bullet (pos ^+^ (deltaT)!*^vel) dir vel life ))
@@ -252,21 +257,7 @@ mainLoop draw w state = do
                 ftime = realToFrac time
 
 
-repeatTwiceAndLoop :: [a] -> [a]
-repeatTwiceAndLoop [] = []
-repeatTwiceAndLoop (x:xs) = (repeatTwiceAndLoop' (x:xs)) ++ [x] where
-    repeatTwiceAndLoop [] = []
-    repeatTwiceAndLoop' [y] = [y]
-    repeatTwiceAndLoop' (x:y:ys) = x:y : repeatTwiceAndLoop' (y:ys)
-
-
-repeatTwice :: [a] -> [a]
-repeatTwice [] = []
-repeatTwice [y] = [y]
-repeatTwice (x:y:ys) = x:y : repeatTwice (y:ys)
-
-
-drawObject :: Object -> IO()
+drawObject :: Object -> IO ()
 drawObject (Object vertices dir pos) = do
     let mat = Matrix2d b a (-a) b
     let y = map (toVertex . (pos ^+^) . ((#*^) mat)) vertices
@@ -276,26 +267,7 @@ drawObject (Object vertices dir pos) = do
         (Vector2d a b) = dir
 
 
-drawChar :: Char -> Float -> Vector2d -> IO(Float)
-drawChar c size (Vector2d x y) = do
-    let (w, vs) = chars !! (ord c - 32)
-    let ws = map (map (toVertex . (\(a, b) -> Vector2d (x + size*realToFrac(a)/32.0) (y + size*(realToFrac(b) - 32)/32.0)))) vs
-
-    GL.color $ GL.Color4 1 1 1 (1 :: GL.GLfloat)
-    forM_ ws $ \y -> do
-        renderPrimitive Lines $ do mapM_ vertex (repeatTwice y)
-
-    return $ (size*realToFrac(w))/32.0
-
-
-drawText :: String -> Float -> Vector2d -> IO()
-drawText [] _ _ = return ()
-drawText (c:cs) size pos@(Vector2d x y) = do 
-    w <- drawChar c size pos 
-    drawText cs size (Vector2d (x + w) y)
-
-
-drawDuplicates :: Object -> IO()
+drawDuplicates :: Object -> IO ()
 drawDuplicates (Object vectors dir pos) = do
     let fx (Vector2d x y) = x; fy (Vector2d x y) = y
 
@@ -313,11 +285,7 @@ draw (GameState playerState particles bullets _ _ _) = do
     drawObject (Object playerModel (ps_direction playerState) (ps_position playerState))
     drawParticles particles
 
-    drawText ("Number of particles: " ++ (show (length particles))) 0.1 (Vector2d (-0.5) 0.5)
-    drawText ("Draw draw draw text lots: " ++ (show (length particles))) 0.1 (Vector2d (-0.5) 0.4)
-    drawText ("Lots of text hi hi: " ++ (show (length particles))) 0.1 (Vector2d (-0.5) 0.3)
-    drawText ("More text: " ++ (show (length particles))) 0.1 (Vector2d (-0.5) 0.2)
-    drawText ("HI hi hi hii. " ++ (show (length particles))) 0.1 (Vector2d (-0.5) 0.1)
+    drawText ("Number of particles: " ++ (show (length particles))) 0.1 (Vector2d (-0.9) 0.9)
 
     forM_ bullets $ \(Bullet pos dir vel _) -> do
         drawObject (Object bulletModel dir pos)

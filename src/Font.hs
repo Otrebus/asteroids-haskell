@@ -1,4 +1,10 @@
-module Font(chars) where
+module Font(chars, drawText) where
+import Math (Vector2d(..), toVertex)
+import qualified Graphics.Rendering.OpenGL as GL
+import Control.Monad
+import Data.Char (ord)
+import Utils
+import Graphics.Rendering.OpenGL (vertex, clear, ClearBuffer(ColorBuffer), renderPrimitive, PrimitiveMode(Lines, Points))
 
 -- Hershey vector font ascii 32 to 126, adapted from the C listing at
 -- https://web.archive.org/web/20191231161857/http://paulbourke.net/dataformats/hershey/
@@ -98,3 +104,21 @@ chars = [(16, []),
          (8, [[(4, 25), (4, -7)]]),
          (14, [[(5, 25), (7, 24), (8, 23), (9, 21), (9, 19), (8, 17), (7, 16), (6, 14), (6, 12), (8, 10)], [(7, 24), (8, 22), (8, 20), (7, 18), (6, 17), (5, 15), (5, 13), (6, 11), (10, 9), (6, 7), (5, 5), (5, 3), (6, 1), (7, 0), (8, -2), (8, -4), (7, -6)], [(8, 8), (6, 6), (6, 4), (7, 2), (8, 1), (9, -1), (9, -3), (8, -5), (7, -6), (5, -7)]]),
          (24, [[(3, 6), (3, 8), (4, 11), (6, 12), (8, 12), (10, 11), (14, 8), (16, 7), (18, 7), (20, 8), (21, 10)], [(3, 8), (4, 10), (6, 11), (8, 11), (10, 10), (14, 7), (16, 6), (18, 6), (20, 7), (21, 10), (21, 12)]])]
+
+
+drawChar :: Float -> Vector2d -> Char -> IO Vector2d
+drawChar size (Vector2d x y) c = do
+    let (w, vs) = chars !! (ord c - 32)
+    let rtf = realToFrac
+    let conv = \(a, b) -> Vector2d (x + size*rtf(a)/32.0) (y + size*(rtf(b) - 32)/32.0)
+    let ws = map (map (toVertex . conv)) vs
+
+    GL.color $ GL.Color4 1 1 1 (1 :: GL.GLfloat)
+    forM_ ws $ \y -> do
+        renderPrimitive Lines $ do mapM_ vertex (repeatTwice y)
+
+    return $ Vector2d (x + (size*realToFrac(w))/32.0) y
+
+
+drawText :: String -> Float -> Vector2d -> IO Vector2d
+drawText (c:cs) size pos = foldM (drawChar size) pos (c:cs)

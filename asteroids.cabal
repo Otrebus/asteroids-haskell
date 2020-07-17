@@ -26,6 +26,7 @@ library
       Math
       Player
       Font
+      Utils
   other-modules:
       Paths_asteroids
   hs-source-dirs:
