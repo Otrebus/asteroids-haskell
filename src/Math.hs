@@ -3,6 +3,7 @@ module Math where
 import Graphics.Rendering.OpenGL
 import Control.Monad.Random
 import Data.List (sort, sortOn)
+import Debug.Trace
 
 data Vector2d = Vector2d Float Float deriving Show
 
@@ -60,49 +61,36 @@ type Time = Float
 
 type Angle = Float
 
-deltas :: Num a => [a] -> [a]
-deltas (x:y:ys) = (y-x) : deltas (y:ys)
-deltas _ = []
-
-rndSplit :: [a] -> Rand StdGen ([a], [a])
-rndSplit (x:xs) = do
-    (as, bs) <- rndSplit(xs)
-    c <- getRandomR(1, 2 :: Int)
-    case c == 1 of
-        True -> return (x:as, bs)
-        False -> return (as, x:bs)
-
-rndSplit _ = return ([], [])
-    
-
 randomPolygon :: Int -> Rand StdGen [Vector2d]
 randomPolygon n = do
-    
-    xs <- liftM (sort . (take n)) $ getRandomRs (0.0 :: Float, 1.0)
-    ys <- liftM (sort . (take n)) $ getRandomRs (0.0 :: Float, 1.0)
 
-    splitX <- getRandomR(1, n-1)
-    splitY <- getRandomR(1, n-1)
+    (dx, mdx) <- vectorize n
+    (dy, mdy) <- vectorize n
 
-    (x1, x2) <- rndSplit xs
-    (y1, y2) <- rndSplit ys
-
-    let minX = minimum x1
-    let maxX = maximum x2
-
-    let minY = minimum y1
-    let maxY = maximum y2
-
-    let dx = deltas $ minX:x1 ++ [maxX]
-    let mdx = (deltas . reverse) $ minX:x2 ++ [maxX]
-    let dy = deltas $ minY:y1 ++ [maxY]
-    let mdy = (deltas . reverse) $ minY:y2 ++ [maxY]
-
-    rs <- getRandomRs(0 :: Float, 1.0)
+    rs <- getRandomRs(0.0, 1.0 :: Float)
     let rndY = map snd $ sortOn fst (zip rs (dy++mdy))
 
     let vs = zipWith (\a b -> Vector2d a b) (dx++mdx) rndY
-
     let vss = sortOn (\(Vector2d x y) -> atan2 y x) vs
 
     return $ scanl1 (^+^) vss
+
+    where 
+        vectorize n = do
+            xs <- (sort . (take n)) <$> getRandomRs (0.0, 1.0)
+            (x1, x2) <- rndSplit xs
+            let (minX, maxX) = (minimum xs, maximum xs)
+            let dx = deltas $ minX:x1 ++ [maxX]
+            let mdx = (deltas . reverse) $ minX:x2 ++ [maxX]
+            return (dx, mdx)
+
+        deltas = zipWith (-) <*> tail
+
+        rndSplit [] = return ([], [])
+        rndSplit (x:xs) = do
+            (as, bs) <- rndSplit xs
+            c <- getRandom
+            return (if c then (x:as, bs) else (as, x:bs))
+
+-- The above should be equal to this but generates a polygon way too large, why?
+-- rndSplit = foldM (\(as, bs) x -> (getRandom >>= (\r -> return (if r then (x:as, bs) else (as, x:bs))))) ([], [])

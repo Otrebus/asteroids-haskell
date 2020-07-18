@@ -5,7 +5,7 @@ import System.IO (hPutStrLn, stderr)
 import Control.Monad
 import qualified Graphics.Rendering.OpenGL as GL hiding (get, rotate)
 import qualified Graphics.UI.GLFW as GLFW
-import Graphics.Rendering.OpenGL (vertex, clear, ClearBuffer(ColorBuffer), renderPrimitive, PrimitiveMode(Lines, Points, QuadStrip, TriangleStrip, LineLoop))
+import Graphics.Rendering.OpenGL (vertex, clear, ClearBuffer(ColorBuffer), renderPrimitive, PrimitiveMode(Lines, Points, QuadStrip, TriangleStrip, LineLoop, TriangleFan))
 import Player
 import System.Exit (exitFailure)
 import Data.Fixed (mod')
@@ -161,6 +161,8 @@ drawParticles particles = do
 drawPoly :: [Vector2d] -> IO ()
 drawPoly vertices = do
 
+    GL.color $ GL.Color4 0.05 0.05 0.05 (1 :: GL.GLfloat)
+    renderPrimitive TriangleFan $ do mapM_ vertex (map toVertex vertices)
     GL.color $ GL.Color4 1 1 1 (1 :: GL.GLfloat)
     renderPrimitive LineLoop $ do mapM_ vertex (map toVertex vertices)
     return ()
@@ -241,6 +243,7 @@ keyCommands = [(GLFW.Key'E, Accelerating),
                (GLFW.Key'F, TurningRight),
                (GLFW.Key'Space, Shooting)]
 
+
 getInput window = map snd <$> (filterM ((isPressed window) . fst) keyCommands)
 
 
@@ -279,7 +282,7 @@ drawObject (Object (lineVertices, triangles) dir pos) = do
 
 
 drawDuplicates :: Object -> IO ()
-drawDuplicates (Object (vectors, _) dir pos) = do
+drawDuplicates (Object (vectors, tris) dir pos) = do
     let fx (Vector2d x y) = x; fy (Vector2d x y) = y
 
     let wrap = [(fx, (<), Vector2d 1.0 0.0, maximum), (fx, (>), Vector2d (-1.0) 0.0, minimum),
@@ -287,10 +290,7 @@ drawDuplicates (Object (vectors, _) dir pos) = do
 
     forM_ wrap $ \(fn, op, v, mm) -> do
         when (fn v `op`(mm (map (fn . (^+^ pos)) vectors))) $ do
-            drawObject (Object playerModel dir (pos ^-^ v^*!2))
-
-
-trans t (Object (ls, vs) x y) = Object (map (\(Vector2d x y) -> Vector2d (x + t) (y + t)) ls, map (map (\(Vector2d a b) -> Vector2d (a + t) (b + t))) vs) x y
+            drawObject (Object (vectors, tris) dir (pos ^-^ v^*!2))
 
 
 draw :: GameState -> IO ()
@@ -299,11 +299,12 @@ draw (GameState playerState particles bullets _ _ _) = do
     drawText ("Number of particles: " ++ (show (length particles))) 0.1 (Vector2d (-0.9) 0.9)
 
     drawObject $ Object playerModel (ps_direction playerState) (ps_position playerState)
+    drawDuplicates $ Object playerModel (ps_direction playerState) (ps_position playerState)
 
     drawParticles particles
 
-    let rng = mkStdGen $ 122 + fromIntegral (toInteger (round((realToFrac (length particles) / 200.0))))
-    let poly = (evalRand (randomPolygon 12) rng)
+    let rng = mkStdGen $ 1220 + fromIntegral (toInteger (round((realToFrac (length particles) / 200.0))))
+    let poly = (evalRand (randomPolygon 24) rng)
     drawPoly poly
 
     forM_ bullets $ \(Bullet pos dir vel _) -> do
