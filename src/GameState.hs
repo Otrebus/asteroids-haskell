@@ -6,6 +6,8 @@ module GameState (
     Thruster(..),
     Particle(..),
     Bullet(..),
+    Asteroid(..),
+    AliveState(..),
     onThrusters,
     onPlayerState,
     onPlayerPos,
@@ -15,11 +17,16 @@ module GameState (
     onBottomLeftThruster,
     onBottomRightThruster,
     onParticles,
-    onBullets) where
+    onBullets,
+    Object(..)) where
 import Math
 import System.Random
 
+
 data Action = Shooting | Accelerating | Decelerating | TurningLeft | TurningRight deriving (Show, Eq)
+data AliveState = Alive | Dead deriving (Show, Eq)
+
+data Object = Object (Vertices, [Vertices]) Direction Position
 
 data PlayerState = PlayerState {
     ps_position :: Position,
@@ -27,7 +34,8 @@ data PlayerState = PlayerState {
     ps_velocity :: Velocity,
     ps_angularVelocity :: Float,
     ps_thrusters :: Thrusters,
-    ps_lastBullet :: Time
+    ps_lastBullet :: Time,
+    ps_aliveState :: AliveState
 } deriving (Show)
 
 
@@ -36,6 +44,13 @@ data Bullet = Bullet {
     b_direction :: Direction,
     b_velocity :: Velocity,
     b_lifeTime :: Float
+} deriving (Show)
+
+data Asteroid = Asteroid {
+    a_position :: Position,
+    a_direction :: Direction,
+    a_velocity :: Velocity,
+    a_vertices :: Vertices
 } deriving (Show)
 
 data Thrusters = Thrusters {
@@ -69,6 +84,7 @@ data GameState = GameState {
     gs_playerState :: PlayerState,
     gs_particles :: [Particle],
     gs_bullets :: [Bullet],
+    gs_asteroids :: [Asteroid],
     gs_time :: Float,
     gs_prevTime :: Float,
     gs_rng :: StdGen
@@ -108,3 +124,6 @@ onParticles f gs = gs { gs_particles = f (gs_particles gs) }
 
 onBullets :: Lifter [Bullet] GameState
 onBullets f gs = gs { gs_bullets = f (gs_bullets gs) }
+
+onAsteroids :: Lifter [Asteroid] GameState
+onAsteroids f gs = gs { gs_asteroids = f (gs_asteroids gs) }

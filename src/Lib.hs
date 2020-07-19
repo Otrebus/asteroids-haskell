@@ -18,9 +18,6 @@ import Control.Monad.Random
 import System.Random
 import Font
 
-
-data Object = Object (Vertices, [Vertices]) Direction Position
-
 bulletVel = 0.90 
 fireRate = 0.23 -- bullets per second
 accRate = 0.2 -- screens per second per second
@@ -111,7 +108,7 @@ addEngineParticles pos dir vel angVel action actions thrusterGetter fp start cur
 addEnginesParticles :: [Action] -> State GameState ()
 addEnginesParticles actions = do
 
-    gs@(GameState (PlayerState pos dir vel angVel _ _) _ _ time prevTime _) <- get
+    gs@(GameState (PlayerState pos dir vel angVel _ _ _) _ _ _ time prevTime _) <- get
 
     let thfun = (ps_thrusters . gs_playerState)
     let engines = [(Accelerating, e_main . thfun, onMainThruster),
@@ -129,7 +126,7 @@ addEnginesParticles actions = do
 addBullets :: State GameState ()
 addBullets = do
     state <- get
-    let GameState (playerState@(PlayerState pos dir vel _ thrusters lastBullet)) _ bullets time _ _ = state
+    let GameState (playerState@(PlayerState pos dir vel _ thrusters lastBullet aliveState)) _ bullets _ time _ _ = state
     when (lastBullet + fireRate < time) $ do
         let bulletPos = pos ^+^ rebase dir plT
         put state {
@@ -158,13 +155,13 @@ drawParticles particles = do
             vertex ((toVertex . p_position) p)
 
 
-drawPoly :: [Vector2d] -> IO ()
-drawPoly vertices = do
+drawAsteroid :: Object -> IO ()
+drawAsteroid (Object (verts, tris) pos dir) = do
 
     GL.color $ GL.Color4 0.05 0.05 0.05 (1 :: GL.GLfloat)
-    renderPrimitive TriangleFan $ do mapM_ vertex (map toVertex vertices)
+    renderPrimitive TriangleFan $ do mapM_ vertex (map toVertex (head tris))
     GL.color $ GL.Color4 1 1 1 (1 :: GL.GLfloat)
-    renderPrimitive LineLoop $ do mapM_ vertex (map toVertex vertices)
+    renderPrimitive LineLoop $ do mapM_ vertex (map toVertex verts)
     return ()
 
 
@@ -176,6 +173,7 @@ updateParticles time deltaT particles = newParticles
             let newBri = (bri*(life-time)/(life-start))**0.85
                 newPos = pos ^+^ (min (time-start) deltaT)!*^vel
             in  Particle newPos vel start life newBri)) filteredParticles
+
 
 updateBullets :: Time -> Time -> [Bullet] -> [Bullet]
 updateBullets time deltaT = filter ((>time) . b_lifeTime) . map (\(Bullet pos dir vel life) -> (Bullet (pos ^+^ (deltaT)!*^vel) dir vel life ))
@@ -195,11 +193,45 @@ normalizePositions = do
     put $ onBullets (map (\bs -> bs { b_position = wrap (b_position bs) })) state
 
 
+inside :: Vertices -> Vertices -> Bool
+inside as bs = or [and [(c ^-^ b) ^%^ (a ^-^ b) > 0 | (b, c) <- zip bs ((tail . cycle) bs)] | a <- as]
+
+
+intersect :: (Vector2d, Vector2d) -> (Vector2d, Vector2d) -> Bool
+intersect (Vector2d p1x p1y, Vector2d p2x p2y) (Vector2d v1x v1y, Vector2d v2x v2y) =
+    t >= 0 && t <= 1 && s >= 0 && s <= 1
+    where
+        a = p1x - p2x; b = v2x - v1x; c = p1y - p2y; d = v2y - v1y; e = p1x - v1x; f = p1y - v1y
+        s = (e*d - b*f)/(a*d - b*c); t = (a*f - e*c)/(a*d - b*c)
+
+
+detectCollision :: Vertices -> Vertices -> Direction -> Bool
+detectCollision ps vs dir = or [intersect (p, p ^+^ dir) (v1, v2) | p <- ps, (v1, v2) <- zip vs ((tail . cycle) vs)]
+
+
+detectCollisions :: State GameState (Bool)
+detectCollisions = do
+    state <- get
+    let GameState (playerState@(PlayerState pos dir vel angVel thrusters lastBullet _)) particles bullets asteroids time prevTime rng = state
+
+    let (verts, tris) = playerModel
+
+    let p1s = map ((^+^ pos) . (rebase dir)) verts
+    let tri1s = [map ((^+^ pos) . (rebase dir)) tri | tri <- tris]
+
+    let a = or (map (\(Asteroid apos adir avel avert) -> detectCollision p1s avert (vel^*!(time - prevTime))) asteroids)
+    let b = or (map (\(Asteroid apos adir avel avert) -> detectCollision avert p1s (vel^*!(prevTime - time))) asteroids)
+    let c = or (map (\(Asteroid apos adir avel avert) -> inside p1s avert) asteroids)
+    let d = or [or (map (\(Asteroid apos adir avel avert) -> inside avert t) asteroids) | t <- tri1s]
+
+    return (a || b || c || d)
+
+
 runFrame :: [Action] -> State GameState ()
 runFrame actions = do
     state <- get
 
-    let GameState (playerState@(PlayerState pos dir vel angVel thrusters lastBullet)) particles bullets time prevTime rng = state
+    let GameState (playerState@(PlayerState pos dir vel angVel thrusters lastBullet aliveState)) particles bullets asteroids time prevTime rng = state
     let delta = time - prevTime
 
     let turnAcc = ((if TurningRight `elem` actions then angularAcc else 0) +
@@ -209,11 +241,18 @@ runFrame actions = do
 
     let turnMatrix = getTurnMatrix deltaAngle
     let newVel = if Accelerating `elem` actions then (vel ^+^ (delta * accRate)!*^dir ) else vel
-    let newPos = pos ^+^ (delta!*^vel) ^+^ (delta*delta*accRate)!*^dir
+    let newPos = pos ^+^ (delta!*^vel) ^+^ (0.5*delta*delta*(if Accelerating `elem` actions then accRate else 0))!*^dir
 
     addEnginesParticles actions
     when (Shooting `elem` actions) $ do
         addBullets
+
+    b <- detectCollisions
+
+    when b $ do
+        trace "BOOM" $ return ()
+        state <- get
+        put $ onPlayerState (\s -> s { ps_aliveState = Dead }) state
 
     state <- get
     let newParticles = updateParticles time delta (gs_particles state)
@@ -294,22 +333,25 @@ drawDuplicates (Object (vectors, tris) dir pos) = do
 
 
 draw :: GameState -> IO ()
-draw (GameState playerState particles bullets _ _ _) = do
+draw gs@(GameState playerState particles bullets asteroids _ _ _) = do
     clear [ColorBuffer]
     drawText ("Number of particles: " ++ (show (length particles))) 0.1 (Vector2d (-0.9) 0.9)
+    drawText ("Fps: " ++ (show (1.0/(gs_time gs - gs_prevTime gs)))) 0.05 (Vector2d (-0.9) (-0.9))
 
-    drawObject $ Object playerModel (ps_direction playerState) (ps_position playerState)
-    drawDuplicates $ Object playerModel (ps_direction playerState) (ps_position playerState)
+    when (ps_aliveState playerState == Alive) $ do
+        drawObject $ Object playerModel (ps_direction playerState) (ps_position playerState)
+        drawDuplicates $ Object playerModel (ps_direction playerState) (ps_position playerState)
 
     drawParticles particles
 
     let rng = mkStdGen $ 1220 + fromIntegral (toInteger (round((realToFrac (length particles) / 200.0))))
-    let poly = (evalRand (randomPolygon 24) rng)
-    drawPoly poly
 
     forM_ bullets $ \(Bullet pos dir vel _) -> do
         drawObject (Object bulletModel dir pos)
         drawDuplicates (Object bulletModel dir pos)
+
+    forM_ asteroids $ \(Asteroid pos dir vel vert) -> do
+        drawAsteroid (Object (vert, [vert]) pos dir)
 
 
 someFunc :: IO ()
@@ -318,10 +360,13 @@ someFunc = do
     time <- GLFW.getTime
 
     rng <- newStdGen
+    let poly = (evalRand (randomPolygon 15 (Vector2d 0.01 0.01) 0.5 0.5) rng)
+
+    let asteroid = Asteroid (Vector2d 0.0 0.0) (Vector2d 0.0 0.0) (Vector2d 0.0 0.0) poly
 
     case time of
         Just t ->
-            mainLoop draw window (GameState (PlayerState startPos startDir startVel 0 thrusters 0.0) [] [] (realToFrac t) (realToFrac t) rng)
+            mainLoop draw window (GameState (PlayerState startPos startDir startVel 0 thrusters 0.0 Alive) [] [] [asteroid] (realToFrac t) (realToFrac t) rng)
         Nothing ->
             return ()
     return ()
