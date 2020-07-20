@@ -44,7 +44,7 @@ data Bullet = Bullet {
     b_direction :: Direction,
     b_velocity :: Velocity,
     b_lifeTime :: Float
-} deriving (Show)
+} deriving (Show, Eq)
 
 data Asteroid = Asteroid {
     a_position :: Position,

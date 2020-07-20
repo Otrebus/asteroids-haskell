@@ -142,6 +142,18 @@ addBullets = do
         }
 
 
+bulletImpact :: Asteroid -> Bullet -> Float -> (Bool, (Vector2d, Vector2d), Float)
+bulletImpact asteroid bullet delta = (impact, mini, t)
+    where 
+          mini = if impact then (head is) else (undefined, undefined)
+          (s, t) = if impact then intersect (b1, b2) (head is) else (0, 0)
+          impact = (not . null) is
+          is = filter (\v -> intersects (b1, b2) v) vs
+          (b1, b2) = (b_position bullet, (b_position bullet) ^+^ (b_velocity bullet)^*!delta)
+          vs = zip vertices ((tail . cycle) vertices)
+          vertices = a_vertices asteroid
+
+
 getTurnMatrix :: Angle -> Matrix2d
 getTurnMatrix theta = Matrix2d (cos theta) (sin(theta)) (-sin theta) (cos theta)
 
@@ -197,16 +209,19 @@ inside :: Vertices -> Vertices -> Bool
 inside as bs = or [and [(c ^-^ b) ^%^ (a ^-^ b) > 0 | (b, c) <- zip bs ((tail . cycle) bs)] | a <- as]
 
 
-intersect :: (Vector2d, Vector2d) -> (Vector2d, Vector2d) -> Bool
+intersect :: (Vector2d, Vector2d) -> (Vector2d, Vector2d) -> (Float, Float)
 intersect (Vector2d p1x p1y, Vector2d p2x p2y) (Vector2d v1x v1y, Vector2d v2x v2y) =
-    t >= 0 && t <= 1 && s >= 0 && s <= 1
+    (t, s)
     where
         a = p1x - p2x; b = v2x - v1x; c = p1y - p2y; d = v2y - v1y; e = p1x - v1x; f = p1y - v1y
         s = (e*d - b*f)/(a*d - b*c); t = (a*f - e*c)/(a*d - b*c)
 
 
+intersects a b = let (t, s) = intersect a b in t >= 0 && t <= 1 && s >= 0 && s <= 1
+
+
 detectCollision :: Vertices -> Vertices -> Direction -> Bool
-detectCollision ps vs dir = or [intersect (p, p ^+^ dir) (v1, v2) | p <- ps, (v1, v2) <- zip vs ((tail . cycle) vs)]
+detectCollision ps vs dir = or [intersects (p, p ^+^ dir) (v1, v2) | p <- ps, (v1, v2) <- zip vs ((tail . cycle) vs)]
 
 
 detectCollisions :: State GameState (Bool)
@@ -253,6 +268,13 @@ runFrame actions = do
         trace "BOOM" $ return ()
         state <- get
         put $ onPlayerState (\s -> s { ps_aliveState = Dead }) state
+
+    let impacts = filter (\(bul, (t, (_, _), _)) -> t) [(bul, bulletImpact ast bul delta) | ast <- asteroids, bul <- bullets]
+
+    when ((not . null) impacts) $ do
+        trace "POW" $ return ()
+        state <- get
+        put $ state { gs_bullets = filter (\b -> (and [(b /= bl) | (bl, _) <- impacts])) (gs_bullets state) }
 
     state <- get
     let newParticles = updateParticles time delta (gs_particles state)

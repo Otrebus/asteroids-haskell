@@ -6,7 +6,7 @@ import Data.List (sort, sortOn)
 import Debug.Trace
 import Control.Applicative
 
-data Vector2d = Vector2d { xComp :: Float, yComp :: Float } deriving Show
+data Vector2d = Vector2d { xComp :: Float, yComp :: Float } deriving (Show, Eq)
 
 data Matrix2d = Matrix2d Float Float Float Float deriving Show
 
