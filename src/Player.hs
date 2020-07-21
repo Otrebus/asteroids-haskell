@@ -10,7 +10,7 @@ plB = Vector2d 0.00 (-0.02)    -- Bottom
 
 playerModel = ([plBl, plB, plBr, plT], [[plBl, plB, plT], [plT, plB, plBr]])
 
-interpolate :: Vector2d -> Vector2d -> Float -> Vector2d
+interpolate :: Vector2d -> Vector2d -> Float -> Vector2d -- TODO: use more, and move
 interpolate vec1 vec2 t = vec1 ^+^ ((vec2 ^-^ vec1) ^*! t)
 
 

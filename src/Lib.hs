@@ -13,6 +13,7 @@ import Math
 import GameState
 import Control.Monad.State (State, put, execState, get)
 import Font (chars)
+import Data.Maybe
 import Debug.Trace
 import Control.Monad.Random
 import System.Random
@@ -142,8 +143,8 @@ addBullets = do
         }
 
 
-bulletImpact :: Asteroid -> Bullet -> Float -> (Bool, (Vector2d, Vector2d), Float)
-bulletImpact asteroid bullet delta = (impact, mini, t)
+bulletImpact :: Asteroid -> Bullet -> Float -> Maybe ((Vector2d, Vector2d), Float)
+bulletImpact asteroid bullet delta = if impact then Just (mini, t) else Nothing
     where 
           mini = if impact then (head is) else (undefined, undefined)
           (s, t) = if impact then intersect (b1, b2) (head is) else (0, 0)
@@ -167,11 +168,11 @@ drawParticles particles = do
             vertex ((toVertex . p_position) p)
 
 
-drawAsteroid :: Object -> IO ()
-drawAsteroid (Object (verts, tris) pos dir) = do
+drawAsteroid :: Vertices -> IO ()
+drawAsteroid verts = do
 
     GL.color $ GL.Color4 0.05 0.05 0.05 (1 :: GL.GLfloat)
-    renderPrimitive TriangleFan $ do mapM_ vertex (map toVertex (head tris))
+    renderPrimitive TriangleFan $ do mapM_ vertex (map toVertex verts)
     GL.color $ GL.Color4 1 1 1 (1 :: GL.GLfloat)
     renderPrimitive LineLoop $ do mapM_ vertex (map toVertex verts)
     return ()
@@ -211,13 +212,13 @@ inside as bs = or [and [(c ^-^ b) ^%^ (a ^-^ b) > 0 | (b, c) <- zip bs ((tail . 
 
 intersect :: (Vector2d, Vector2d) -> (Vector2d, Vector2d) -> (Float, Float)
 intersect (Vector2d p1x p1y, Vector2d p2x p2y) (Vector2d v1x v1y, Vector2d v2x v2y) =
-    (t, s)
+    (s, t)
     where
         a = p1x - p2x; b = v2x - v1x; c = p1y - p2y; d = v2y - v1y; e = p1x - v1x; f = p1y - v1y
         s = (e*d - b*f)/(a*d - b*c); t = (a*f - e*c)/(a*d - b*c)
 
 
-intersects a b = let (t, s) = intersect a b in t >= 0 && t <= 1 && s >= 0 && s <= 1
+intersects a b = let (s, t) = intersect a b in t >= 0 && t <= 1 && s >= 0 && s <= 1
 
 
 detectCollision :: Vertices -> Vertices -> Direction -> Bool
@@ -234,12 +235,47 @@ detectCollisions = do
     let p1s = map ((^+^ pos) . (rebase dir)) verts
     let tri1s = [map ((^+^ pos) . (rebase dir)) tri | tri <- tris]
 
-    let a = or (map (\(Asteroid apos adir avel avert) -> detectCollision p1s avert (vel^*!(time - prevTime))) asteroids)
-    let b = or (map (\(Asteroid apos adir avel avert) -> detectCollision avert p1s (vel^*!(prevTime - time))) asteroids)
-    let c = or (map (\(Asteroid apos adir avel avert) -> inside p1s avert) asteroids)
-    let d = or [or (map (\(Asteroid apos adir avel avert) -> inside avert t) asteroids) | t <- tri1s]
+    let a = or (map (\(Asteroid adir avel avert) -> detectCollision p1s avert (vel^*!(time - prevTime))) asteroids)
+    let b = or (map (\(Asteroid adir avel avert) -> detectCollision avert p1s (vel^*!(prevTime - time))) asteroids)
+    let c = or (map (\(Asteroid adir avel avert) -> inside p1s avert) asteroids)
+    let d = or [or (map (\(Asteroid adir avel avert) -> inside avert t) asteroids) | t <- tri1s]
 
     return (a || b || c || d)
+
+
+polyArea :: Vertices -> Float
+polyArea vs = 0.5*(sum [(xComp v)*(yComp w) - (yComp v)*(xComp w) | (v, w) <- zip vs ((tail . cycle) vs)])
+
+
+polyCirc :: Vertices -> Float
+polyCirc vs = sum [len (v ^-^ w) | (v, w) <- zip vs ((tail . cycle) vs)]
+
+
+calcRatio :: Vertices -> Float
+calcRatio [] = 0
+calcRatio vs = let area = polyArea vs; circ = polyCirc vs in (area)/(circ*circ*4*pi)
+
+
+loopSplits :: (Vector2d, Vector2d) -> Float -> Vertices -> (Vector2d, Vector2d) -> Vertices -> (Vertices, Vertices)
+loopSplits (p1, p2) t (xs) (v1, v2) [] = ([], [])
+loopSplits (p1, p2) t (xs) (v1, v2) (y:ys)
+    | otherwise = if (calcRatio cc)*(calcRatio dd) > (calcRatio aa)*(calcRatio bb) then (cc, dd) else (aa, bb)
+    where
+        (cc, dd) = ((interpolate p1 p2 t):p2:xs ++ (v1:[interpolate v1 v2 0.5]), (interpolate v1 v2 0.5):v2:y:(ys ++ [p1, interpolate p1 p2 t]))
+        (aa, bb) = loopSplits (p1, p2) t (xs ++ [v2]) (v2, y) ys
+
+
+maprest :: [a] -> [[a]]
+maprest (x:xs) = (x:xs) : maprest xs
+
+
+splitAsteroid :: Asteroid -> (Vector2d, Vector2d) -> Float -> (Asteroid, Asteroid)
+splitAsteroid asteroid (p1, p2) t =
+    (Asteroid (Vector2d 0 0) (Vector2d 0 0) as, Asteroid (Vector2d 0 0) (Vector2d 0 0) bs)
+    where
+        (as, bs) = loopSplits (p1, p2) t [] (v1, v2) (takeWhile (/= p1) rest)
+        (v1:v2:rest):_ = (dropWhile ((/= p2) . head)) $ maprest (cycle vs)
+        vs = a_vertices asteroid
 
 
 runFrame :: [Action] -> State GameState ()
@@ -269,12 +305,25 @@ runFrame actions = do
         state <- get
         put $ onPlayerState (\s -> s { ps_aliveState = Dead }) state
 
-    let impacts = filter (\(bul, (t, (_, _), _)) -> t) [(bul, bulletImpact ast bul delta) | ast <- asteroids, bul <- bullets]
+    let impacts = filter (\(bul, ast, m) -> isJust m) [(bul, ast, bulletImpact ast bul delta) | ast <- asteroids, bul <- bullets]
+    let impactedAsteroids = map (\(_, ast, _) -> ast) impacts
+
+    let newAsteroidPairs = map ((\(bul, ast, Just ((v1, v2), t)) -> splitAsteroid ast (v1, v2) t)) impacts
+    let newAsteroids = concat $ map (\(a, b) -> [a, b]) newAsteroidPairs
+
+    when (newAsteroids /= []) $ do
+        trace (show (newAsteroids)) $ return ()
+
+        -- bulletImpact :: Asteroid -> Bullet -> Float -> Maybe ((Vector2d, Vector2d), Float)
 
     when ((not . null) impacts) $ do
+
         trace "POW" $ return ()
         state <- get
-        put $ state { gs_bullets = filter (\b -> (and [(b /= bl) | (bl, _) <- impacts])) (gs_bullets state) }
+        put $ state {
+            gs_asteroids = (filter (\ast -> (not (elem ast impactedAsteroids))) (gs_asteroids state)) ++ newAsteroids,
+            gs_bullets = filter (\b -> (and [(b /= bl) | (bl, _, _) <- impacts])) (gs_bullets state)
+        }
 
     state <- get
     let newParticles = updateParticles time delta (gs_particles state)
@@ -372,8 +421,8 @@ draw gs@(GameState playerState particles bullets asteroids _ _ _) = do
         drawObject (Object bulletModel dir pos)
         drawDuplicates (Object bulletModel dir pos)
 
-    forM_ asteroids $ \(Asteroid pos dir vel vert) -> do
-        drawAsteroid (Object (vert, [vert]) pos dir)
+    forM_ asteroids $ \(Asteroid dir vel vert) -> do
+        drawAsteroid vert
 
 
 someFunc :: IO ()
@@ -384,7 +433,7 @@ someFunc = do
     rng <- newStdGen
     let poly = (evalRand (randomPolygon 15 (Vector2d 0.01 0.01) 0.5 0.5) rng)
 
-    let asteroid = Asteroid (Vector2d 0.0 0.0) (Vector2d 0.0 0.0) (Vector2d 0.0 0.0) poly
+    let asteroid = Asteroid (Vector2d 0.0 0.0) (Vector2d 0.0 0.0) poly
 
     case time of
         Just t ->
