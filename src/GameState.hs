@@ -47,7 +47,7 @@ data Bullet = Bullet {
 } deriving (Show, Eq)
 
 data Asteroid = Asteroid {
-    a_direction :: Direction,
+    a_angularVelocity :: Float,
     a_velocity :: Velocity,
     a_vertices :: Vertices
 } deriving (Show, Eq)

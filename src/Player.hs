@@ -26,7 +26,7 @@ thrusters = Thrusters mainThruster reverseThruster topLeftThruster topRightThrus
 
 
 startPos = (Vector2d 0 0)
-startDir = (Vector2d 0 1.0)
+startDir = normalize (Vector2d 0.2 0.5)
 startVel = (Vector2d 0.0 0.0)
 
 
