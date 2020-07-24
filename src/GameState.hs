@@ -18,6 +18,7 @@ module GameState (
     onBottomRightThruster,
     onParticles,
     onBullets,
+    onAsteroids,
     Object(..)) where
 import Math
 import System.Random

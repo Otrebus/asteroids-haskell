@@ -177,7 +177,8 @@ bulletImpact asteroid bullet delta = if impacts /= [] then Just (v, t) else Noth
           impacts = filter (\(b1, b2, e, s, t) -> s >= -2.5 && s <= 2.5 && t >= 0.0 && t <= 1.0) is
           is = [
               (b1, b2, v, s, t) | v <- (take nvs vs),
-              let (b1, b2) = (bulPos, bulPos ^+^ ((bulVel ^-^ astVel) ^-^ rotV centroid v (a_angularVelocity asteroid)) ^*! delta),
+              bp <- [bulPos, bulPos ^+^ Vector2d 2.0 0.0, bulPos ^+^ Vector2d (-2.0) 0.0, bulPos ^+^ Vector2d 0.0 2.0, bulPos ^+^ Vector2d 0.0 (-2.0)],
+              let (b1, b2) = (bp, bp ^+^ ((bulVel ^-^ astVel) ^-^ rotV centroid v (a_angularVelocity asteroid)) ^*! delta),
               let (s, t) = intersect (b1, b2) v]
 
           bulVel = b_velocity bullet
@@ -262,6 +263,11 @@ wrap :: Vector2d -> Vector2d
 wrap (Vector2d x y) = Vector2d (mod' (x + 1.0) 2.0 - 1.0) (mod' (y + 1.0) 2.0 - 1.0)
 
 
+wrapVertices :: Vertices -> Vertices
+wrapVertices vs = map (^+^ (wrap (polyCentroid vs))) cfVs
+    where cfVs = map (^-^ polyCentroid vs) vs
+
+
 normalizePositions :: State GameState ()
 normalizePositions = do
     state <- get
@@ -270,6 +276,8 @@ normalizePositions = do
     put $ onParticles (map (\ps -> ps { p_position = wrap (p_position ps) })) state
     state <- get
     put $ onBullets (map (\bs -> bs { b_position = wrap (b_position bs) })) state
+    state <- get
+    put $ onAsteroids (map (\as -> as { a_vertices = wrapVertices (a_vertices as) })) state
 
 
 inside :: Vertices -> Vertices -> Bool
@@ -434,6 +442,7 @@ runFrame actions = do
         gs_bullets = newBullets,
         gs_asteroids = newAsteroids
     }
+
     normalizePositions
 
 
@@ -498,6 +507,18 @@ drawDuplicates (Object (vectors, tris) dir pos) = do
             drawObject (Object (vectors, tris) dir (pos ^-^ v^*!2))
 
 
+drawDuplicatesAsteroids :: Vertices -> IO ()
+drawDuplicatesAsteroids vectors = do
+    let fx (Vector2d x y) = x; fy (Vector2d x y) = y
+
+    let wrap = [(fx, (<), Vector2d 1.0 0.0, maximum), (fx, (>), Vector2d (-1.0) 0.0, minimum),
+                (fy, (<), Vector2d 0.0 1.0, maximum), (fy, (>), Vector2d 0.0 (-1.0), minimum)]
+
+    forM_ wrap $ \(fn, op, v, mm) -> do
+        when (fn v `op` (mm (map fn vectors))) $ do
+            drawAsteroid $ map (^-^ v^*!2) vectors
+
+
 draw :: GameState -> IO ()
 draw gs@(GameState playerState particles bullets asteroids _ _ _) = do
     clear [ColorBuffer]
@@ -518,6 +539,8 @@ draw gs@(GameState playerState particles bullets asteroids _ _ _) = do
 
     forM_ asteroids $ \(Asteroid dir vel vert) -> do
         drawAsteroid vert
+        drawDuplicatesAsteroids vert
+
 
 
 someFunc :: IO ()
