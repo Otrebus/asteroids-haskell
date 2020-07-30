@@ -378,6 +378,33 @@ explodeNewAsteroids time (x:y:zs) n = do
     explodeNewAsteroids time zs n
 
 
+randomPolyDivision :: [Vector2d] -> Int -> Rand StdGen [[Vector2d]]
+randomPolyDivision vs 0 = return [vs]
+randomPolyDivision v r = do
+    let n = length v
+    let vs = cycle v
+
+    i <- getRandomR(0, n-2)
+    j <- liftM (i+) (getRandomR (i+1, n-1))
+
+    if i == j
+        then
+            randomPolyDivision v r
+        else do
+            a <- getRandomR(0.4, 0.6 :: Float)
+            b <- getRandomR(0.4, 0.6 :: Float)
+
+            let p1 = (interpolate (vs !! i) (vs !! (i+1)) a)
+            let p2 = (interpolate (vs !! j) (vs !! (j+1)) b)
+            let vs1 = p2 : p1 : (take (j-i) (drop (i+1) vs))
+            let vs2 = p1 : p2 : (take ((n-(j-i))) (drop (j+1) vs))
+
+            v1s <- randomPolyDivision vs1 (r-1)
+            v2s <- randomPolyDivision vs2 (r-1)
+
+            return (v1s ++ v2s)
+
+
 runFrame :: [Action] -> State GameState ()
 runFrame actions = do
     state <- get
@@ -531,6 +558,11 @@ draw gs@(GameState playerState particles bullets asteroids _ _ _) = do
 
     drawParticles particles
 
+    let poly = (evalRand (randomPolyDivision [Vector2d 0 0, Vector2d 0 0.2, Vector2d 0.2 0.0] 4) (mkStdGen 123))
+    print poly
+    forM_ poly $ \p -> do
+        drawObject (Object (p, [p]) (Vector2d 1.0 0) (Vector2d 0 0))
+
     let rng = mkStdGen $ 1220 + fromIntegral (toInteger (round((realToFrac (length particles) / 200.0))))
 
     forM_ bullets $ \(Bullet pos dir vel _) -> do
@@ -540,7 +572,6 @@ draw gs@(GameState playerState particles bullets asteroids _ _ _) = do
     forM_ asteroids $ \(Asteroid dir vel vert) -> do
         drawAsteroid vert
         drawDuplicatesAsteroids vert
-
 
 
 someFunc :: IO ()
