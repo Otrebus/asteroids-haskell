@@ -69,6 +69,18 @@ rotate :: Float -> Vector2d -> Vector2d
 rotate theta v = (Matrix2d(cos theta) (-sin(theta)) (sin theta) (cos theta))#*^v
 
 
+rotateAround :: Float -> Vector2d -> Vector2d -> Vector2d
+rotateAround theta o v = (Matrix2d(cos theta) (-sin(theta)) (sin theta) (cos theta))#*^(v ^-^ o) ^+^ o
+
+
+rndInt :: Int -> Int -> State GameState (Int)
+rndInt min max = do
+    state <- get
+    let (value, newGenerator) = randomR (min, max) (gs_rng state)
+    put (state { gs_rng = newGenerator })
+    return value
+
+
 rndFloat :: Float -> Float -> State GameState (Float)
 rndFloat min max = do
     state <- get
@@ -77,23 +89,24 @@ rndFloat min max = do
     return value
 
 
-addExplosionParticle :: Time -> Vector2d -> Vector2d -> Float -> State GameState (Particle)
-addExplosionParticle time pos dir pw = do
+addExplosionParticle :: Time -> Vector2d -> Vector2d -> Vector2d -> Float -> Float -> State GameState (Particle)
+addExplosionParticle time pos dir vel pw life = do
 
     v <- liftM (**1.1) (rndFloat 0 pw)
     ang <- liftM (**1.1) (rndFloat 0 2.3)
     x <- rndFloat (-1) 1
+    ang2 <- rndFloat 0 (2*pi)
 
-    let pvel = normalize (rotate (x*ang) dir)^*!v
+    let pvel = if (dir /= (Vector2d 0.0 0.0)) then (normalize (rotate (x*ang) dir))^*!v else (rotate ang2 (Vector2d 1.0 0.0))^*!v
     let ppos = pos
 
-    return (Particle ppos pvel time (time + 1.5) 0.8)
+    return (Particle ppos (pvel ^+^ vel) time (time + life) 0.8)
 
 
-addExplosion :: Time -> Vector2d -> Vector2d -> Int -> Float -> State GameState ()
-addExplosion time pos dir n pw = do
+addExplosion :: Time -> Vector2d -> Vector2d -> Vector2d -> Int -> Float -> Float -> State GameState ()
+addExplosion time pos dir vel n pw life = do
 
-    particles <- replicateM n (addExplosionParticle time pos dir pw)
+    particles <- replicateM n (addExplosionParticle time pos dir vel pw life)
 
     state <- get
     put (state { gs_particles = particles ++ (gs_particles state) } )
@@ -134,7 +147,7 @@ addEngineParticles pos dir vel angVel action actions thrusterGetter fp start cur
 addEnginesParticles :: [Action] -> State GameState ()
 addEnginesParticles actions = do
 
-    gs@(GameState (PlayerState pos dir vel angVel _ _ _) _ _ _ time prevTime _) <- get
+    gs@(GameState (PlayerState pos dir vel angVel _ _ _) _ _ _ _ time prevTime _) <- get
 
     let thfun = (ps_thrusters . gs_playerState)
     let engines = [(Accelerating, e_main . thfun, onMainThruster),
@@ -152,7 +165,7 @@ addEnginesParticles actions = do
 addBullets :: State GameState ()
 addBullets = do
     state <- get
-    let GameState (playerState@(PlayerState pos dir vel _ thrusters lastBullet aliveState)) _ bullets _ time _ _ = state
+    let GameState (playerState@(PlayerState pos dir vel _ thrusters lastBullet aliveState)) _ _ bullets _ time _ _ = state
     when (lastBullet + fireRate < time) $ do
         let bulletPos = pos ^+^ rebase dir plT
         put state {
@@ -218,12 +231,12 @@ drawParticles particles = do
             vertex ((toVertex . p_position) p)
 
 
-drawAsteroid :: Vertices -> IO ()
-drawAsteroid verts = do
+drawPolygon :: GL.Color4 Float -> GL.Color4 Float -> Vertices -> IO ()
+drawPolygon back fore verts = do
 
-    GL.color $ GL.Color4 0.05 0.05 0.05 (1 :: GL.GLfloat)
+    GL.color $ back
     renderPrimitive TriangleFan $ do mapM_ vertex (map toVertex verts)
-    GL.color $ GL.Color4 1 1 1 (1 :: GL.GLfloat)
+    GL.color $ fore
     renderPrimitive LineLoop $ do mapM_ vertex (map toVertex verts)
     return ()
 
@@ -236,6 +249,16 @@ updateParticles time deltaT particles = newParticles
             let newBri = (bri*(life-time)/(life-start))**0.85
                 newPos = pos ^+^ (min (time-start) deltaT)!*^vel
             in  Particle newPos vel start life newBri)) filteredParticles
+
+
+updatePolygonParticles :: Time -> Time -> [PolygonParticle] -> [PolygonParticle]
+updatePolygonParticles time deltaT particles = newParticles
+    where
+        filteredParticles = filter ((>time) . pp_lifeTime) $ particles
+        newParticles = map (\(PolygonParticle polys vel angVel life) -> (
+            let newPos = (rotateAround (angVel*deltaT) (polyCentroid polys) . ((deltaT)!*^vel ^+^)) in
+                PolygonParticle (map newPos polys) vel angVel life)) filteredParticles
+                
 
 
 updateBullets :: Time -> Time -> [Bullet] -> [Bullet]
@@ -278,7 +301,8 @@ normalizePositions = do
     put $ onBullets (map (\bs -> bs { b_position = wrap (b_position bs) })) state
     state <- get
     put $ onAsteroids (map (\as -> as { a_vertices = wrapVertices (a_vertices as) })) state
-
+    state <- get
+    put $ onPolygonParticles (map (\pp -> pp { pp_vertices = wrapVertices (pp_vertices pp) })) state
 
 inside :: Vertices -> Vertices -> Bool
 inside as bs = or [and [(c ^-^ b) ^%^ (a ^-^ b) > 0 | (b, c) <- zip bs ((tail . cycle) bs)] | a <- as]
@@ -302,7 +326,7 @@ detectCollision ps vs dir = or [intersects (p, p ^+^ dir) (v1, v2) | p <- ps, (v
 detectCollisions :: State GameState (Bool)
 detectCollisions = do
     state <- get
-    let GameState (playerState@(PlayerState pos dir vel angVel thrusters lastBullet _)) particles bullets asteroids time prevTime rng = state
+    let GameState (playerState@(PlayerState pos dir vel angVel thrusters lastBullet _)) particles polygonParticles bullets asteroids time prevTime rng = state
 
     let (verts, tris) = playerModel
 
@@ -372,27 +396,27 @@ explodeNewAsteroids time [] n = return ()
 explodeNewAsteroids time (x:y:zs) n = do
 
     let vs = a_vertices x
-    addExplosion time (head vs) (normalize ((head vs) ^-^ (last vs))) 100 2.5
-    addExplosion time (last vs) (normalize ((last vs) ^-^ (head vs))) 15 1
+    addExplosion time (head vs) (normalize ((head vs) ^-^ (last vs))) (a_velocity x) 100 2.5 1.5
+    addExplosion time (last vs) (normalize ((last vs) ^-^ (head vs))) (a_velocity y) 15 1 1.5
 
     explodeNewAsteroids time zs n
 
 
-randomPolyDivision :: [Vector2d] -> Int -> Rand StdGen [[Vector2d]]
+randomPolyDivision :: [Vector2d] -> Int -> State GameState [[Vector2d]]
 randomPolyDivision vs 0 = return [vs]
 randomPolyDivision v r = do
     let n = length v
     let vs = cycle v
 
-    i <- getRandomR(0, n-2)
-    j <- liftM (i+) (getRandomR (i+1, n-1))
+    i <- rndInt 0 (n `div` 2 - 1)
+    let j = (i + (n `div` 2)) `mod` n
 
     if i == j
         then
             randomPolyDivision v r
         else do
-            a <- getRandomR(0.4, 0.6 :: Float)
-            b <- getRandomR(0.4, 0.6 :: Float)
+            a <- rndFloat 0.4 0.6
+            b <- rndFloat 0.4 0.6
 
             let p1 = (interpolate (vs !! i) (vs !! (i+1)) a)
             let p2 = (interpolate (vs !! j) (vs !! (j+1)) b)
@@ -405,11 +429,92 @@ randomPolyDivision v r = do
             return (v1s ++ v2s)
 
 
+explodeShip :: State GameState ()
+explodeShip = do
+
+    state <- get
+
+    let GameState (playerState@(PlayerState pos dir vel angVel thrusters lastBullet aliveState)) particles polygonParticles bullets asteroids time prevTime rng = state
+
+    let (Vector2d a b) = dir
+
+    let (lineVertices, triangles) = playerModel
+    let (dir, pos) = ((ps_direction playerState), (ps_position playerState))
+
+    let mat = Matrix2d b a (-a) b
+    let tris = map (\v -> (map ((pos ^+^) . ((#*^) mat)) v)) triangles
+
+    addExplosion time pos (Vector2d 0.0 0.0) vel 1450 1.0 5.0
+
+    forM_ tris $ \p -> do
+        state <- get
+        newPs <- randomPolyDivision p 3
+        ppps <- mapM (\p -> (launchPolygon p pos time vel)) newPs
+        put $ (onPolygonParticles (\pps -> ppps ++ pps)) state
+
+        where 
+            launchPolygon poly pos time vel = do
+                v <- liftM (**1.2) (rndFloat 5.0 15.0)
+                ang <- liftM (**1.1) (rndFloat 0 2.3)
+                x <- rndFloat (-1) 1
+                angVel <- liftM (**2.1) (rndFloat 0 3.0)
+                dirAng <- rndFloat (-1) 1
+
+                let polyVel = ((polyCentroid poly) ^-^ pos)^*!v
+
+                return (PolygonParticle poly (vel ^+^ polyVel) (dirAng*angVel) (time + 1.5))
+
+
+explodeAsteroid :: Asteroid -> State GameState ()
+explodeAsteroid asteroid = do
+
+    state <- get
+
+    let time = gs_time state
+    let vertices = a_vertices asteroid
+
+    let pos = polyCentroid . a_vertices $ asteroid
+    let vel = a_velocity asteroid
+
+    addExplosion time pos (Vector2d 0.0 0.0) vel (round ((polyArea . a_vertices $ asteroid)*100000)) 1.0 5.0
+
+    state <- get
+    newPs <- randomPolyDivision vertices 3
+    ppps <- mapM (\p -> (launchPolygon p pos time vel)) newPs
+    put $ (onPolygonParticles (\pps -> ppps ++ pps)) state
+
+    where 
+        launchPolygon poly pos time vel = do
+            v <- liftM (**1.2) (rndFloat 5.0 15.0)
+            ang <- liftM (**1.1) (rndFloat 0 2.3)
+            x <- rndFloat (-1) 1
+            angVel <- liftM (**2.1) (rndFloat 0 3.0)
+            dirAng <- rndFloat (-1) 1
+
+            let polyVel = ((polyCentroid poly) ^-^ pos)^*!v
+
+            return (PolygonParticle poly (vel ^+^ polyVel) (dirAng*angVel) (time + 1.5))
+
+
+annihilateAsteroids :: State GameState ()
+annihilateAsteroids = do
+    asteroids <- liftM gs_asteroids get
+
+    remainder <- filterM (\a -> do
+        let lives = polyArea (a_vertices a) > 0.001
+        when (not lives) $ explodeAsteroid a
+        return lives
+        ) asteroids
+
+    state <- get
+    put $ onAsteroids (\a -> remainder) state
+
+
 runFrame :: [Action] -> State GameState ()
 runFrame actions = do
     state <- get
 
-    let GameState (playerState@(PlayerState pos dir vel angVel thrusters lastBullet aliveState)) particles bullets asteroids time prevTime rng = state
+    let GameState (playerState@(PlayerState pos dir vel angVel thrusters lastBullet aliveState)) particles polygonParticles bullets asteroids time prevTime rng = state
     let delta = time - prevTime
 
     let turnAcc = ((if TurningRight `elem` actions then (-angularAcc) else 0) +
@@ -425,11 +530,12 @@ runFrame actions = do
     when (Shooting `elem` actions) $ do
         addBullets
 
-    b <- detectCollisions
-
-    when b $ do
-        state <- get
-        put $ onPlayerState (\s -> s { ps_aliveState = Dead }) state
+    when (aliveState == Alive) $ do
+        b <- detectCollisions
+        when b $ do
+            state <- get
+            put $ onPlayerState (\s -> s { ps_aliveState = Dead }) state
+            explodeShip
 
     forM asteroids $ (\a -> do
         trace (show (polyCirc (a_vertices a))) $ return () )
@@ -443,7 +549,6 @@ runFrame actions = do
     explodeNewAsteroids time newAsteroids 100
 
         -- bulletImpact :: Asteroid -> Bullet -> Float -> Maybe ((Vector2d, Vector2d), Float)
-
     when ((not . null) impacts) $ do
         state <- get
         put $ state {
@@ -456,6 +561,7 @@ runFrame actions = do
     let newParticles = updateParticles time delta (gs_particles state)
     let newBullets = updateBullets time delta (gs_bullets state)
     let newAsteroids = updateAsteroids time delta (gs_asteroids state)
+    let newPolygonParticles = updatePolygonParticles time delta (gs_polygonParticles state)
 
     put $ state {
         gs_playerState = (gs_playerState state) {
@@ -467,8 +573,11 @@ runFrame actions = do
         gs_time = time,
         gs_particles = newParticles,
         gs_bullets = newBullets,
-        gs_asteroids = newAsteroids
+        gs_asteroids = newAsteroids,
+        gs_polygonParticles = newPolygonParticles
     }
+
+    annihilateAsteroids
 
     normalizePositions
 
@@ -508,7 +617,8 @@ mainLoop draw w state = do
 
 
 drawObject :: Object -> IO ()
-drawObject (Object (lineVertices, triangles) dir pos) = do
+drawObject (Object (lineVertices, triangles) (Vector2d a b) pos) = do
+
     let mat = Matrix2d b a (-a) b
     let tris = map (\v -> (map (toVertex . (pos ^+^) . ((#*^) mat)) v)) triangles
     let y = map (toVertex . (pos ^+^) . ((#*^) mat)) lineVertices
@@ -518,8 +628,7 @@ drawObject (Object (lineVertices, triangles) dir pos) = do
 
     GL.color $ GL.Color4 1 1 1 (1 :: GL.GLfloat)
     renderPrimitive LineLoop $ do mapM_ vertex y
-    return () where
-        (Vector2d a b) = dir
+    return ()
 
 
 drawDuplicates :: Object -> IO ()
@@ -543,11 +652,11 @@ drawDuplicatesAsteroids vectors = do
 
     forM_ wrap $ \(fn, op, v, mm) -> do
         when (fn v `op` (mm (map fn vectors))) $ do
-            drawAsteroid $ map (^-^ v^*!2) vectors
+            drawPolygon (GL.Color4 0.05 0.05 0.05 1.0) (GL.Color4 1.0 1.0 1.0 1.0) $ map (^-^ v^*!2) vectors
 
 
 draw :: GameState -> IO ()
-draw gs@(GameState playerState particles bullets asteroids _ _ _) = do
+draw gs@(GameState playerState particles polygonParticles bullets asteroids time _ _) = do
     clear [ColorBuffer]
     drawText ("Number of particles: " ++ (show (length particles))) 0.1 (Vector2d (-0.9) 0.9)
     drawText ("Fps: " ++ (show (1.0/(gs_time gs - gs_prevTime gs)))) 0.05 (Vector2d (-0.9) (-0.9))
@@ -558,20 +667,20 @@ draw gs@(GameState playerState particles bullets asteroids _ _ _) = do
 
     drawParticles particles
 
-    let poly = (evalRand (randomPolyDivision [Vector2d 0 0, Vector2d 0 0.2, Vector2d 0.2 0.0] 4) (mkStdGen 123))
-    print poly
-    forM_ poly $ \p -> do
-        drawObject (Object (p, [p]) (Vector2d 1.0 0) (Vector2d 0 0))
-
-    let rng = mkStdGen $ 1220 + fromIntegral (toInteger (round((realToFrac (length particles) / 200.0))))
+    -- let rng = mkStdGen $ 1220 + fromIntegral (toInteger (round((realToFrac (length particles) / 200.0))))
 
     forM_ bullets $ \(Bullet pos dir vel _) -> do
         drawObject (Object bulletModel dir pos)
         drawDuplicates (Object bulletModel dir pos)
 
     forM_ asteroids $ \(Asteroid dir vel vert) -> do
-        drawAsteroid vert
+        drawPolygon (GL.Color4 0.05 0.05 0.05 1.0) (GL.Color4 1.0 1.0 1.0 1.0) vert
         drawDuplicatesAsteroids vert
+
+    forM_ polygonParticles $ \(PolygonParticle vert vel angVel life) -> do
+        let t = abs (life - time)
+        let c = min 1.0 t ** 1.2
+        drawPolygon (GL.Color4 0.05 0.05 0.05 1.0) (GL.Color4 c c c c) vert
 
 
 someFunc :: IO ()
@@ -586,7 +695,7 @@ someFunc = do
 
     case time of
         Just t ->
-            mainLoop draw window (GameState (PlayerState startPos startDir startVel 0 thrusters 0.0 Alive) [] [] [asteroid] (realToFrac t) (realToFrac t) rng)
+            mainLoop draw window (GameState (PlayerState startPos startDir startVel 0 thrusters 0.0 Alive) [] [] [] [asteroid] (realToFrac t) (realToFrac t) rng)
         Nothing ->
             return ()
     return ()
