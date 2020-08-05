@@ -21,6 +21,8 @@ module GameState (
     onBullets,
     onAsteroids,
     onPolygonParticles,
+    onParticlePos,
+    onBulletPos,
     Object(..)) where
 import Math
 import System.Random
@@ -103,7 +105,6 @@ data GameState = GameState {
     gs_rng :: StdGen
 } deriving (Show)
 
-
 type Unop a = a -> a
 
 type Lifter p q = Unop p -> Unop q
@@ -143,3 +144,9 @@ onBullets f gs = gs { gs_bullets = f (gs_bullets gs) }
 
 onAsteroids :: Lifter [Asteroid] GameState
 onAsteroids f gs = gs { gs_asteroids = f (gs_asteroids gs) }
+
+onParticlePos :: Lifter Position Particle
+onParticlePos f p = p { p_position = f (p_position p) }
+
+onBulletPos :: Lifter Position Bullet
+onBulletPos f b = b { b_position = f (b_position b) }

@@ -128,8 +128,10 @@ addEngineParticle time thruster speed playerPos playerDir playerVel  = do
     put (state { gs_particles = ((Particle (playerPos ^+^ newPos) (playerVel ^+^ ((newnDir)^*!(speed + s))) time (time + 2.5 + 0.2) (0.5 + q))):(gs_particles state) } )
 
 
-addEngineParticles pos dir vel angVel action actions thrusterGetter fp start current time = do
-    state <- get
+addEngineParticles action actions thrusterGetter fp start current = do
+
+    state@(GameState (PlayerState pos dir vel angVel _ _ _) _ _ _ _ time prevTime _) <- get
+
     let nextParticleTime = current + (t_emissionInterval (thrusterGetter state))
     when (action `elem` actions && nextParticleTime < time) $ do
 
@@ -141,13 +143,13 @@ addEngineParticles pos dir vel angVel action actions thrusterGetter fp start cur
         addEngineParticle nextParticleTime (thrusterGetter state) 0.6 (pos ^+^ (vel ^*! (nextParticleTime-start))) newDir vel
         state <- get
         put $ ((onPlayerState . onThrusters . fp) (\t -> t { t_lastEmitted = nextParticleTime } )) state
-        addEngineParticles pos dir vel angVel action actions thrusterGetter fp start nextParticleTime time
+        addEngineParticles action actions thrusterGetter fp start nextParticleTime
 
 
 addEnginesParticles :: [Action] -> State GameState ()
 addEnginesParticles actions = do
 
-    gs@(GameState (PlayerState pos dir vel angVel _ _ _) _ _ _ _ time prevTime _) <- get
+    gs@(GameState (PlayerState pos dir vel _ _ _ _) _ _ _ _ time prevTime _) <- get
 
     let thfun = (ps_thrusters . gs_playerState)
     let engines = [(Accelerating, e_main . thfun, onMainThruster),
@@ -159,7 +161,7 @@ addEnginesParticles actions = do
     forM_ engines $ \(ac, th, fp) -> do
         let t0 = t_lastEmitted (th gs); int = t_emissionInterval (th gs)
         let t = t0 + int * realToFrac (floor ((prevTime - t0)/int))
-        addEngineParticles pos dir vel angVel ac actions th fp t t time
+        addEngineParticles ac actions th fp t t
 
 
 addBullets :: State GameState ()
@@ -296,9 +298,9 @@ normalizePositions = do
     state <- get
     put $ (onPlayerState . onPlayerPos) (wrap) state
     state <- get
-    put $ onParticles (map (\ps -> ps { p_position = wrap (p_position ps) })) state
+    put $ onParticles (map (onParticlePos wrap)) state
     state <- get
-    put $ onBullets (map (\bs -> bs { b_position = wrap (b_position bs) })) state
+    put $ onBullets (map (onBulletPos wrap)) state
     state <- get
     put $ onAsteroids (map (\as -> as { a_vertices = wrapVertices (a_vertices as) })) state
     state <- get
