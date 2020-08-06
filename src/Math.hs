@@ -1,10 +1,12 @@
 module Math where
 
-import Graphics.Rendering.OpenGL
+import Graphics.Rendering.OpenGL hiding (Angle)
 import Control.Monad.Random
 import Data.List (sort, sortOn)
 import Debug.Trace
 import Control.Applicative
+import Data.Fixed (mod')
+
 
 data Vector2d = Vector2d { xComp :: Float, yComp :: Float } deriving (Show, Eq)
 
@@ -67,6 +69,11 @@ type Time = Float
 
 type Angle = Float
 
+idMatrix :: Matrix2d
+idMatrix = Matrix2d 1.0 0.0 0.0 1.0
+
+getTurnMatrix :: Angle -> Matrix2d
+getTurnMatrix theta = Matrix2d (cos theta) (-sin(theta)) (sin theta) (cos theta)
 
 bbox vs = (minimum . (map xComp) $ vs, minimum . (map yComp) $ vs, maximum . (map xComp) $ vs, maximum . (map yComp) $ vs)
 
@@ -108,7 +115,65 @@ randomPolygon n pos width height = do
             (as, bs) <- rndSplit xs
             c <- getRandom
             return (if c then (x:as, bs) else (as, x:bs))
+        -- The above should be equal to this but generates a polygon way too large, why?
+        -- rndSplit = foldM (\(as, bs) x -> (getRandom >>= (\r -> return (if r then (x:as, bs) else (as, x:bs))))) ([], [])
 
 
--- The above should be equal to this but generates a polygon way too large, why?
--- rndSplit = foldM (\(as, bs) x -> (getRandom >>= (\r -> return (if r then (x:as, bs) else (as, x:bs))))) ([], [])
+rebase :: Vector2d -> Vector2d -> Vector2d
+rebase (Vector2d a b) (Vector2d x y) = y!*^(Vector2d a b) ^+^ x!*^(Vector2d b (-a))
+
+
+rotate :: Float -> Vector2d -> Vector2d
+rotate theta v = (Matrix2d(cos theta) (-sin(theta)) (sin theta) (cos theta))#*^v
+
+
+rotateAround :: Float -> Vector2d -> Vector2d -> Vector2d
+rotateAround theta o v = (Matrix2d(cos theta) (-sin(theta)) (sin theta) (cos theta))#*^(v ^-^ o) ^+^ o
+
+
+moveVertices vel delta = map (\v -> v ^+^ (delta)!*^vel)
+
+
+wrap :: Vector2d -> Vector2d
+wrap (Vector2d x y) = Vector2d (mod' (x + 1.0) 2.0 - 1.0) (mod' (y + 1.0) 2.0 - 1.0)
+
+
+wrapVertices :: Vertices -> Vertices
+wrapVertices vs = map (^+^ (wrap (polyCentroid vs))) cfVs
+    where cfVs = map (^-^ polyCentroid vs) vs
+
+
+polyCentroid :: Vertices -> Vector2d
+polyCentroid vs = (Vector2d xs ys)^/!(6*area)
+    where
+        area = polyArea vs
+        xs = sum [ (xi+xi1)*(xi*yi1 - xi1*yi) | ((Vector2d xi yi), (Vector2d xi1 yi1)) <- zip vs ((tail . cycle) vs)]
+        ys = sum [ (yi+yi1)*(xi*yi1 - xi1*yi) | ((Vector2d xi yi), (Vector2d xi1 yi1)) <- zip vs ((tail . cycle) vs)]
+
+
+polyArea :: Vertices -> Float
+polyArea vs = 0.5*(sum [(xComp v)*(yComp w) - (yComp v)*(xComp w) | (v, w) <- zip vs ((tail . cycle) vs)])
+
+
+polyCirc :: Vertices -> Float
+polyCirc vs = sum [len (v ^-^ w) | (v, w) <- zip vs ((tail . cycle) vs)]
+
+
+calcRatio :: Vertices -> Float
+calcRatio [] = 0
+calcRatio vs = let area = polyArea vs; circ = polyCirc vs in (area*4*pi)/(circ*circ)
+
+
+intersect :: (Vector2d, Vector2d) -> (Vector2d, Vector2d) -> (Float, Float)
+intersect (Vector2d p1x p1y, Vector2d p2x p2y) (Vector2d v1x v1y, Vector2d v2x v2y) =
+    (s, t)
+    where
+        a = p1x - p2x; b = v2x - v1x; c = p1y - p2y; d = v2y - v1y; e = p1x - v1x; f = p1y - v1y
+        s = (e*d - b*f)/(a*d - b*c); t = (a*f - e*c)/(a*d - b*c)
+
+
+intersects a b = let (s, t) = intersect a b in t >= 0 && t <= 1 && s >= 0.0 && s <= 1
+
+
+inside :: Vertices -> Vertices -> Bool
+inside as bs = or [and [(c ^-^ b) ^%^ (a ^-^ b) > 0 | (b, c) <- zip bs ((tail . cycle) bs)] | a <- as]

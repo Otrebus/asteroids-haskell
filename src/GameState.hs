@@ -23,9 +23,12 @@ module GameState (
     onPolygonParticles,
     onParticlePos,
     onBulletPos,
-    Object(..)) where
+    Object(..),
+    rndFloat,
+    rndInt) where
 import Math
 import System.Random
+import Control.Monad.State (State, put, execState, get)
 
 
 data Action = Shooting | Accelerating | Decelerating | TurningLeft | TurningRight deriving (Show, Eq)
@@ -150,3 +153,19 @@ onParticlePos f p = p { p_position = f (p_position p) }
 
 onBulletPos :: Lifter Position Bullet
 onBulletPos f b = b { b_position = f (b_position b) }
+
+
+rndInt :: Int -> Int -> State GameState (Int)
+rndInt min max = do
+    state <- get
+    let (value, newGenerator) = randomR (min, max) (gs_rng state)
+    put (state { gs_rng = newGenerator })
+    return value
+
+
+rndFloat :: Float -> Float -> State GameState (Float)
+rndFloat min max = do
+    state <- get
+    let (value, newGenerator) = randomR (min,max) (gs_rng state)
+    put (state { gs_rng = newGenerator})
+    return value
