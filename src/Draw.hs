@@ -21,9 +21,9 @@ normalizePositions = do
     state <- get
     put $ onBullets (map (onBulletPos wrap)) state
     state <- get
-    put $ onAsteroids (map (\as -> as { a_vertices = wrapVertices (a_vertices as) })) state
+    put $ onAsteroids (map (onPolygonVertices wrapVertices )) state
     state <- get
-    put $ onPolygonParticles (map (\pp -> pp { pp_vertices = wrapVertices (pp_vertices pp) })) state
+    put $ onPolygonParticles (map (onPolygonParticleVertices wrapVertices )) state
 
 
 drawParticles :: [Particle] -> IO ()
@@ -142,45 +142,56 @@ drawObject (Object (lineVertices, triangles) (Vector2d a b) pos) = do
 
     let mat = Matrix2d b a (-a) b
     let tris = map (\v -> (map (toVertex . (pos ^+^) . ((#*^) mat)) v)) triangles
-    let y = map (toVertex . (pos ^+^) . ((#*^) mat)) lineVertices
+    let ys = map (toVertex . (pos ^+^) . ((#*^) mat)) lineVertices
 
     GL.color $ GL.Color4 0 0 0 (1 :: GL.GLfloat)
     forM_ tris (\tri -> renderPrimitive TriangleStrip $ (do mapM_ vertex tri))
 
     GL.color $ GL.Color4 1 1 1 (1 :: GL.GLfloat)
-    renderPrimitive LineLoop $ do mapM_ vertex y
+    renderPrimitive LineLoop $ do mapM_ vertex ys
     return ()
 
 
 drawDuplicates :: Object -> IO ()
 drawDuplicates (Object (vectors, tris) dir pos) = do
+
+    let (Vector2d x y) = pos
+    let (Vector2d a b) = dir
+    let mat = Matrix2d b a (-a) b
+    let mv = map ((pos ^+^) . ((#*^) mat)) vectors
+
     let fx (Vector2d x y) = x; fy (Vector2d x y) = y
 
-    let wrap = [(fx, (<), Vector2d 1.0 0.0, maximum), (fx, (>), Vector2d (-1.0) 0.0, minimum),
-                (fy, (<), Vector2d 0.0 1.0, maximum), (fy, (>), Vector2d 0.0 (-1.0), minimum)]
+    let a = 2*(-signum x) :: Float
+    let b = 2*(-signum y) :: Float
 
-    forM_ wrap $ \(fn, op, v, mm) -> do
-        when (fn v `op`(mm (map (fn . (^+^ pos)) vectors))) $ do
-            drawObject (Object (vectors, tris) dir (pos ^-^ v^*!2))
+    let wrap = [Vector2d a 0.0, Vector2d 0.0 b, Vector2d a 0.0, Vector2d a b]
+
+    forM_ wrap $ \v -> do
+        drawObject (Object (vectors, tris) dir (pos ^+^ v))
 
 
 drawDuplicatesAsteroids :: Vertices -> IO ()
 drawDuplicatesAsteroids vectors = do
+
+    let (Vector2d x y) = polyCentroid vectors
+
+    let a = 2*(-signum x) :: Float
+    let b = 2*(-signum y) :: Float
+
     let fx (Vector2d x y) = x; fy (Vector2d x y) = y
 
-    let wrap = [(fx, (<), Vector2d 1.0 0.0, maximum), (fx, (>), Vector2d (-1.0) 0.0, minimum),
-                (fy, (<), Vector2d 0.0 1.0, maximum), (fy, (>), Vector2d 0.0 (-1.0), minimum)]
+    let wrap = [Vector2d a 0.0, Vector2d 0.0 b, Vector2d a 0.0, Vector2d a b]
 
-    forM_ wrap $ \(fn, op, v, mm) -> do
-        when (fn v `op` (mm (map fn vectors))) $ do
-            drawPolygon (GL.Color4 0.05 0.05 0.05 1.0) (GL.Color4 1.0 1.0 1.0 1.0) $ map (^-^ v^*!2) vectors
+    forM_ wrap $ \v -> do
+        drawPolygon (GL.Color4 0.05 0.05 0.05 1.0) (GL.Color4 1.0 1.0 1.0 1.0) $ map (^+^ v) vectors
 
 
 draw :: GameState -> IO ()
 draw gs@(GameState playerState particles polygonParticles bullets asteroids time _ _) = do
     clear [ColorBuffer]
-    drawText ("Number of particles: " ++ (show (length particles))) 0.1 (Vector2d (-0.9) 0.9)
-    drawText ("Fps: " ++ (show (1.0/(gs_time gs - gs_prevTime gs)))) 0.05 (Vector2d (-0.9) (-0.9))
+    drawText  0.1 (Vector2d (-0.9) 0.9) ("Number of particles: " ++ (show (length particles)))
+    drawText  0.05 (Vector2d (-0.9) (-0.9)) ("Fps: " ++ (show (1.0/(gs_time gs - gs_prevTime gs))))
 
     when (ps_aliveState playerState == Alive) $ do
         drawObject $ Object playerModel (ps_direction playerState) (ps_position playerState)

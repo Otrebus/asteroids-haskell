@@ -291,6 +291,7 @@ annihilateAsteroids = do
     put $ onAsteroids (\a -> remainder) state
 
 
+updateAsteroids :: Float -> Float -> [Asteroid] -> [Asteroid]
 updateAsteroids time delta =
     map (\asteroid -> 
     let 

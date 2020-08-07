@@ -20,7 +20,9 @@ module GameState (
     onParticles,
     onBullets,
     onAsteroids,
+    onPolygonParticleVertices,
     onPolygonParticles,
+    onPolygonVertices,
     onParticlePos,
     onBulletPos,
     Object(..),
@@ -154,6 +156,11 @@ onParticlePos f p = p { p_position = f (p_position p) }
 onBulletPos :: Lifter Position Bullet
 onBulletPos f b = b { b_position = f (b_position b) }
 
+onPolygonVertices :: Lifter [Vector2d] Asteroid
+onPolygonVertices f as = as { a_vertices = f (a_vertices as) }
+
+onPolygonParticleVertices :: Lifter [Vector2d] PolygonParticle
+onPolygonParticleVertices f pp = pp { pp_vertices = f (pp_vertices pp) }
 
 rndInt :: Int -> Int -> State GameState (Int)
 rndInt min max = do
