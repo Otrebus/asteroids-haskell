@@ -1,7 +1,7 @@
 module Game where
 
 import Math
-import GameState
+import State
 import Control.Monad.State (State, put, execState, get, when, filterM, liftM, forM_, replicateM)
 import Player
 import Data.Ord (comparing)

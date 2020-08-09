@@ -4,12 +4,13 @@ import qualified Graphics.Rendering.OpenGL as GL hiding (get, rotate)
 import Graphics.Rendering.OpenGL (vertex, clear, ClearBuffer(ColorBuffer), renderPrimitive, PrimitiveMode(Lines, Points, QuadStrip, TriangleStrip, LineLoop, TriangleFan))
 import Font
 import Math
-import GameState
+import State
 import Control.Monad.State (State, put, execState, get)
 import Control.Monad
 import Player
 import Game
 import Data.Maybe
+import qualified Graphics.UI.GLFW as GLFW
 
 
 normalizePositions :: State GameState ()
@@ -68,8 +69,33 @@ updateBullets :: Time -> Time -> [Bullet] -> [Bullet]
 updateBullets time deltaT = filter ((>time) . b_lifeTime) . map (\(Bullet pos dir vel life) -> (Bullet (pos ^+^ (deltaT)!*^vel) dir vel life ))
 
 
-runFrame :: [Action] -> State GameState ()
-runFrame actions = do
+runFrame :: [GLFW.Key] -> State ProgramState ()
+runFrame input = do
+
+    let keyCommands = [(GLFW.Key'E, Accelerating),
+                (GLFW.Key'S, TurningLeft),
+                (GLFW.Key'D, Decelerating),
+                (GLFW.Key'F, TurningRight),
+                (GLFW.Key'Space, Shooting),
+                (GLFW.Key'Escape, Escaping)]
+
+    let actions = map snd $ filter ((`elem` input) . fst) keyCommands
+
+    state <- get
+
+    let newState = state {
+        gls_gameState = execState (runGameFrame actions) (gls_gameState state)
+    }
+
+    let prevPressed = gls_keysPressed state
+    let newDown = filter (\k -> not (k `elem` prevPressed)) input
+
+    put $ newState { gls_mode = if GLFW.Key'Escape `elem` newDown then Menu else Playing }
+
+
+runGameFrame :: [Action] -> State GameState ()
+runGameFrame actions = do
+
     state <- get
 
     let GameState (playerState@(PlayerState pos dir vel angVel thrusters lastBullet aliveState)) particles polygonParticles bullets asteroids time prevTime rng = state
@@ -189,7 +215,9 @@ drawDuplicatesAsteroids vectors = do
 
 draw :: GameState -> IO ()
 draw gs@(GameState playerState particles polygonParticles bullets asteroids time _ _) = do
+
     clear [ColorBuffer]
+
     drawText  0.1 (Vector2d (-0.9) 0.9) ("Number of particles: " ++ (show (length particles)))
     drawText  0.05 (Vector2d (-0.9) (-0.9)) ("Fps: " ++ (show (1.0/(gs_time gs - gs_prevTime gs))))
 

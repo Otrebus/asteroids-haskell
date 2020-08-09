@@ -1,6 +1,6 @@
 module Player where
 import Math
-import GameState
+import State
 
 plBl = Vector2d (-0.04) (-0.04) -- Bottom left corner
 plT = Vector2d 0 0.04           -- Top corner

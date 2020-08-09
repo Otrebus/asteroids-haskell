@@ -24,7 +24,8 @@ executable asteroids-exe
       Font
       Draw
       Game
-      GameState
+      Menu
+      State
       Math
       Player
   hs-source-dirs:
@@ -32,7 +33,7 @@ executable asteroids-exe
   ghc-options: -threaded -rtsopts -with-rtsopts=-N
   build-depends:
     base >=4.7 && <5
-    , GLFW-b == 1.*
+    , GLFW-b == 3.3.0.0
     , OpenGL >= 3 && < 3.1
     , mtl == 2.2.2
     , random

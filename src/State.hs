@@ -1,4 +1,4 @@
-module GameState (
+module State (
     GameState (..),
     PlayerState (..),
     Action (..),
@@ -9,6 +9,10 @@ module GameState (
     Bullet(..),
     Asteroid(..),
     AliveState(..),
+    ProgramState(..),
+    MenuState(..),
+    ProgramMode(..),
+    MenuChoice(..),
     onThrusters,
     onPlayerState,
     onPlayerPos,
@@ -31,10 +35,13 @@ module GameState (
 import Math
 import System.Random
 import Control.Monad.State (State, put, execState, get)
+import qualified Graphics.UI.GLFW as GLFW (Key)
 
 
-data Action = Shooting | Accelerating | Decelerating | TurningLeft | TurningRight deriving (Show, Eq)
+data Action = Shooting | Accelerating | Decelerating | TurningLeft | TurningRight | Escaping deriving (Show, Eq)
 data AliveState = Alive | Dead deriving (Show, Eq)
+data ProgramMode = Intro | Playing | GameOver | WinLevel | Menu | Exiting deriving (Show, Eq)
+data MenuChoice = Continue | Quit | Yes | No deriving (Show, Eq)
 
 data Object = Object (Vertices, [Vertices]) Direction Position
 
@@ -110,6 +117,17 @@ data GameState = GameState {
     gs_rng :: StdGen
 } deriving (Show)
 
+data MenuState = MenuState {
+    ms_menuChoice :: MenuChoice
+}
+
+data ProgramState = ProgramState {
+    gls_gameState :: GameState,
+    gls_menuState :: MenuState,
+    gls_mode :: ProgramMode,
+    gls_keysPressed :: [GLFW.Key]
+}
+
 type Unop a = a -> a
 
 type Lifter p q = Unop p -> Unop q
@@ -161,6 +179,9 @@ onPolygonVertices f as = as { a_vertices = f (a_vertices as) }
 
 onPolygonParticleVertices :: Lifter [Vector2d] PolygonParticle
 onPolygonParticleVertices f pp = pp { pp_vertices = f (pp_vertices pp) }
+
+onGameState :: Lifter GameState ProgramState
+onGameState f ps = ps { gls_gameState = f (gls_gameState ps) }
 
 rndInt :: Int -> Int -> State GameState (Int)
 rndInt min max = do

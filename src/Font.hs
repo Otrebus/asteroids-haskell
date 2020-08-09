@@ -123,5 +123,5 @@ drawText size pos = foldM (drawChar size) pos
 centerText :: Float -> Vector2d -> Vector2d -> String -> IO Vector2d 
 centerText size (Vector2d x1 y1) (Vector2d x2 y2) text = drawText size pos text
     where
-        pos = Vector2d (x1 + (x2-x1)/2 - (size*textWidth text)/2) y1
+        pos = Vector2d (x1 + (x2-x1)/2 - (size*textWidth text)/2) (y1 + (y2-y1)/2 - (size/2))
         textWidth = foldr ((+) <$> \c -> (fst $ chars !! (ord c - 32))/32.0) 0.0
