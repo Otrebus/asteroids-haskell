@@ -21,6 +21,7 @@ import System.Random
 import Font
 import qualified Draw
 import qualified Menu
+import qualified Intro
 
 
 errorCallback :: GLFW.ErrorCallback
@@ -60,12 +61,11 @@ isPressed window key = do
 keys = [GLFW.Key'E, GLFW.Key'S, GLFW.Key'D, GLFW.Key'F, GLFW.Key'Space, GLFW.Key'Escape, GLFW.Key'Enter]
 
 
-mainLoop :: GLFW.Window -> ProgramState -> IO ()
-mainLoop w gls@(ProgramState gameState menuState mode input) = do
+mainLoop :: GLFW.Window -> ProgramState -> Time -> IO ()
+mainLoop w gls@(ProgramState gameState menuState introState mode input) prevTime = do
     close <- GLFW.windowShouldClose w
 
     unless (close || mode == Exiting) $ do
-        newTime <- GLFW.getTime
 
         GLFW.swapBuffers w
         GLFW.pollEvents
@@ -74,20 +74,25 @@ mainLoop w gls@(ProgramState gameState menuState mode input) = do
         case mode of
             Playing -> Draw.draw gameState
             Menu -> Menu.draw w menuState
+            Intro -> Intro.draw w introState
 
+        newTime <- GLFW.getTime
         case newTime of
-            Nothing -> mainLoop w gls
-            Just time -> mainLoop w newState where
+            Nothing -> mainLoop w gls prevTime
+            Just time -> let 
                 
                 newState = case mode of
                     Playing -> (execState (Draw.runFrame input) newTimeState) { gls_keysPressed = input }
-                    Menu -> (execState (Menu.runFrame input) gls) { gls_keysPressed = input, gls_gameState = gameState { gs_time = realToFrac time, gs_prevTime = realToFrac time } }
+                    Menu -> (execState (Menu.runFrame input) newTimeState) { gls_keysPressed = input }
+                    Intro -> (execState (Intro.runFrame input) newTimeState) { gls_keysPressed = input }
 
-                    where
-                        newTimeState = gls { gls_gameState = gameState { gs_time = realToFrac time , gs_prevTime = prevTime } }
-                        prevTime = (gs_time . gls_gameState) gls
+                newTimeState = case mode of
+                    Playing -> gls { gls_gameState = gameState { gs_time = ((gs_time . gls_gameState) gls) + (realToFrac time) - prevTime, gs_prevTime = (gs_time . gls_gameState) gls } }
+                    Intro -> gls { gls_introState = introState { is_time = ((is_time . gls_introState) gls) + (realToFrac time) - prevTime, is_prevTime = (is_time . gls_introState) gls } }
+                    _ -> gls
 
-
+                in mainLoop w newState (realToFrac time)
+                
 
 main :: IO ()
 main = do
@@ -100,12 +105,14 @@ main = do
     let poly = (evalRand (randomPolygon 13 (Vector2d 0.21 0.21) 0.5 0.5) rng)
     let asteroid = Asteroid 0.25 (Vector2d 0.0 0.0) poly
     let menuState = MenuState Continue
+    let gameState = GameState (PlayerState startPos startDir startVel 0 thrusters 0.0 Alive) [] [] [] [asteroid] 0.0 0.0 rng
+    let introState = IntroState 0.0 0.0 []
     let keysPressed = []
-    let mode = Playing
+    let mode = Intro
     case time of
         Just t -> do
-            let gameState = GameState (PlayerState startPos startDir startVel 0 thrusters 0.0 Alive) [] [] [] [asteroid] (realToFrac t) (realToFrac t) rng
-            mainLoop window (ProgramState gameState menuState mode keysPressed)
+            let rt = realToFrac t
+            mainLoop window (ProgramState gameState { gs_time = rt, gs_prevTime = rt } menuState introState mode keysPressed) rt
         Nothing ->
             return ()
 

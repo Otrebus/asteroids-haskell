@@ -10,6 +10,8 @@ import Data.Fixed (mod')
 
 data Vector2d = Vector2d { xComp :: Float, yComp :: Float } deriving (Show, Eq)
 
+data Vector3d = Vector3d Float Float Float deriving (Show, Eq)
+
 data Matrix2d = Matrix2d Float Float Float Float deriving Show
 
 -- The logic behind the operator syntax is that # is a matrix, ^ is a vector and ! is a scalar,

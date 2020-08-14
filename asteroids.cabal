@@ -25,6 +25,7 @@ executable asteroids-exe
       Draw
       Game
       Menu
+      Intro
       State
       Math
       Player

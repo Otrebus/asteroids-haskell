@@ -218,8 +218,8 @@ draw gs@(GameState playerState particles polygonParticles bullets asteroids time
 
     clear [ColorBuffer]
 
-    drawText  0.1 (Vector2d (-0.9) 0.9) ("Number of particles: " ++ (show (length particles)))
-    drawText  0.05 (Vector2d (-0.9) (-0.9)) ("Fps: " ++ (show (1.0/(gs_time gs - gs_prevTime gs))))
+    drawText 0.1 (Vector2d (-0.9) 0.9) ("Number of particles: " ++ (show (length particles)))
+    drawText 0.05 (Vector2d (-0.9) (-0.9)) ("Fps: " ++ (show (1.0/(gs_time gs - gs_prevTime gs))))
 
     when (ps_aliveState playerState == Alive) $ do
         drawObject $ Object playerModel (ps_direction playerState) (ps_position playerState)

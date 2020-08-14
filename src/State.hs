@@ -12,6 +12,7 @@ module State (
     ProgramState(..),
     MenuState(..),
     ProgramMode(..),
+    IntroState(..),
     MenuChoice(..),
     onThrusters,
     onPlayerState,
@@ -121,9 +122,16 @@ data MenuState = MenuState {
     ms_menuChoice :: MenuChoice
 }
 
+data IntroState = IntroState {
+    is_time :: Float,
+    is_prevTime :: Float,
+    is_particles :: [Vector3d]
+}
+
 data ProgramState = ProgramState {
     gls_gameState :: GameState,
     gls_menuState :: MenuState,
+    gls_introState :: IntroState,
     gls_mode :: ProgramMode,
     gls_keysPressed :: [GLFW.Key]
 }
