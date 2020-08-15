@@ -14,6 +14,7 @@ module State (
     ProgramMode(..),
     IntroState(..),
     MenuChoice(..),
+    Star(..),
     onThrusters,
     onPlayerState,
     onPlayerPos,
@@ -30,6 +31,7 @@ module State (
     onPolygonVertices,
     onParticlePos,
     onBulletPos,
+    onStars,
     Object(..),
     rndFloat,
     rndInt) where
@@ -122,11 +124,18 @@ data MenuState = MenuState {
     ms_menuChoice :: MenuChoice
 }
 
+data Star = Star {
+    st_pos :: Vector2d,
+    st_startTime :: Float
+} deriving Show
+
 data IntroState = IntroState {
     is_time :: Float,
     is_prevTime :: Float,
-    is_particles :: [Vector3d]
-}
+    is_stars :: [Star],
+    is_lastStar :: Float,
+    is_rng :: StdGen
+} deriving Show
 
 data ProgramState = ProgramState {
     gls_gameState :: GameState,
@@ -166,6 +175,9 @@ onPlayerPos f ps = ps { ps_position = f (ps_position ps) }
 
 onParticles :: Lifter [Particle] GameState
 onParticles f gs = gs { gs_particles = f (gs_particles gs) }
+
+onStars :: Lifter [Star] IntroState
+onStars f is = is { is_stars = f (is_stars is) }
 
 onPolygonParticles :: Lifter [PolygonParticle] GameState
 onPolygonParticles f gs = gs { gs_polygonParticles = f (gs_polygonParticles gs) }

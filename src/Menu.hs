@@ -39,7 +39,6 @@ runFrame input = do
         put $ state { gls_mode = Playing }
 
 
-
 drawCursor :: Float -> Float -> IO ()
 drawCursor x y = do
     drawPolygon (GL.Color4 0.00 0.00 0.00 1.0) (GL.Color4 1.0 1.0 1.0 1.0) pm

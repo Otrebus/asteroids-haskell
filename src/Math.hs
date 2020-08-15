@@ -10,8 +10,6 @@ import Data.Fixed (mod')
 
 data Vector2d = Vector2d { xComp :: Float, yComp :: Float } deriving (Show, Eq)
 
-data Vector3d = Vector3d Float Float Float deriving (Show, Eq)
-
 data Matrix2d = Matrix2d Float Float Float Float deriving Show
 
 -- The logic behind the operator syntax is that # is a matrix, ^ is a vector and ! is a scalar,
@@ -58,6 +56,9 @@ normalize v = v ^/! (len v)
 
 toVertex :: Vector2d -> Vertex2 Float
 toVertex (Vector2d a b) = Vertex2 (a :: GLfloat) (b :: GLfloat)
+
+fromPair :: (Float, Float) -> Vector2d
+fromPair = uncurry Vector2d
 
 type Vertices = [Vector2d]
 

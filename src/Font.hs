@@ -1,5 +1,5 @@
 module Font(chars, drawText, centerText) where
-import Math (Vector2d(..), toVertex)
+import Math
 import qualified Graphics.Rendering.OpenGL as GL
 import Control.Monad
 import Data.Char (ord)
@@ -106,9 +106,9 @@ chars = [(16, []),
 
 
 drawChar :: Float -> Vector2d -> Char -> IO Vector2d
-drawChar size (Vector2d x y) c = do
+drawChar size pos@(Vector2d x y) c = do
     let (w, vs) = chars !! (ord c - 32)
-    let conv = \(a, b) -> Vector2d (x + size*a/32) (y + size*(b - 32)/32)
+    let conv = (pos ^+^) . (size/32.0 !*^) . (uncurry Vector2d)
 
     GL.color $ GL.Color4 1 1 1 (1 :: GL.GLfloat)
     forM_ (map (map (toVertex . conv)) vs) $ renderPrimitive LineStrip <$> mapM_ vertex

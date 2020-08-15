@@ -1,15 +1,50 @@
 module Intro where
 
 import qualified Graphics.UI.GLFW as GLFW
-import State
+import qualified Graphics.Rendering.OpenGL as GL hiding (get)
+import Graphics.Rendering.OpenGL (vertex, clear, ClearBuffer(ColorBuffer), renderPrimitive, PrimitiveMode(Lines, Points, QuadStrip, TriangleStrip, LineLoop, TriangleFan))
+
+import State hiding (rndFloat)
 import Graphics.Rendering.OpenGL (ClearBuffer(ColorBuffer), clear)
+import Graphics.Rendering.OpenGL (vertex, clear, ClearBuffer(ColorBuffer), renderPrimitive, PrimitiveMode(Lines, Points, QuadStrip, TriangleStrip, LineLoop, TriangleFan))
+
 import Math
+import System.Random
 import Control.Monad.State
 import Font
+import Debug.Trace
 
 
-updateParticles :: Time -> Time -> [Vector3d] -> [Vector3d]
-updateParticles time deltaT particles = particles
+rndFloat :: Float -> Float -> State IntroState (Float)
+rndFloat min max = do
+
+    state <- get
+    let (value, newGenerator) = randomR (min, max) (is_rng state)
+    put (state { is_rng = newGenerator } )
+    return value
+
+
+spawnStars :: Float -> Float -> State IntroState ()
+spawnStars lastStar time = do
+
+    state <- get
+
+    r <- rndFloat 0.001 0.002
+    let nextStar = lastStar + r
+
+    when (nextStar < time) $ do
+
+        x <- rndFloat (-20.0) 20.0
+        y <- rndFloat (-20.0) 20.0
+
+        let randomStar = Star (Vector2d x y) nextStar
+
+        state <- get
+        put $ (onStars) ((:) randomStar) state
+        state <- get
+        put $ state { is_lastStar = nextStar }
+
+        spawnStars nextStar time
 
 
 runFrame :: [GLFW.Key] -> State ProgramState ()
@@ -17,35 +52,60 @@ runFrame input = do
     
     state <- get
 
-    let prevPressed = gls_keysPressed state
-    let newDown = filter (\k -> not (k `elem` prevPressed)) input
-
-    when (GLFW.Key'Enter `elem` newDown || GLFW.Key'Space `elem` newDown) $ do
-        put $ state { gls_mode = Playing }
-
-    let newState = state {
+    put $ state {
         gls_introState = execState runIntroFrame (gls_introState state)
     }
 
-    put $ newState { gls_mode = if GLFW.Key'Escape `elem` newDown then Menu else Playing }
-
     let prevPressed = gls_keysPressed state
     let newDown = filter (\k -> not (k `elem` prevPressed)) input
 
-    put $ newState { gls_mode = if GLFW.Key'Escape `elem` newDown then Menu else Playing }
+    when (GLFW.Key'Enter `elem` newDown) $ do
+        state <- get
+        put $ state { gls_mode = Playing }
+
+    return ()
 
 
 runIntroFrame :: State IntroState ()
 runIntroFrame = do
+
     state <- get
-    let particles = updateParticles 0.0 0.0 (is_particles state)
-    put $ state { is_particles = particles }
+
+    trace "hi" $ return ()
+
+    spawnStars (is_lastStar state) (is_time state)
+    state <- get
+    put $  (onStars ((filter (\s ->  (is_time state) - (st_startTime s) < 10.0)))) state
     
     return ()
 
+
+drawStars :: [Star] -> Time -> IO ()
+drawStars particles time = do
+    renderPrimitive Points $ forM_ particles renderStar where
+        renderStar s = do
+            let Star (Vector2d x y) spawnTime = s
+
+            let c = color (time - spawnTime)
+            GL.color $ GL.Color4 c c c c
+
+            let z = 10.0 - (time - spawnTime)
+            vertex (toVertex $ Vector2d (x/z) (y/z))
+
+            where
+                color t
+                    | t < 2.0 = 0.65*t/2.0
+                    | t > 9.0 = 0.65*(10-t)
+                    | otherwise = 0.65
+
+
 draw :: GLFW.Window -> IntroState -> IO ()
-draw window menuState = do
+draw window introState = do
     clear [ColorBuffer]
 
-    centerText 0.5 (Vector2d (-1.0) (-0.3)) (Vector2d 1.0 0.3) "Asteroids"
+    centerText 0.3 (Vector2d (-1.0) (-0.0)) (Vector2d 1.0 0.3) "Asteroids"
+    centerText 0.1 (Vector2d (-1.0) (-0.5)) (Vector2d 1.0 0.3) "Press enter to start"
+
+    drawStars (is_stars introState) (is_time introState)
+
     return ()

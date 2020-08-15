@@ -102,11 +102,12 @@ main = do
     GLFW.setStickyKeysInputMode window GLFW.StickyKeysInputMode'Enabled
 
     rng <- newStdGen
+    rng2 <- newStdGen
     let poly = (evalRand (randomPolygon 13 (Vector2d 0.21 0.21) 0.5 0.5) rng)
     let asteroid = Asteroid 0.25 (Vector2d 0.0 0.0) poly
     let menuState = MenuState Continue
     let gameState = GameState (PlayerState startPos startDir startVel 0 thrusters 0.0 Alive) [] [] [] [asteroid] 0.0 0.0 rng
-    let introState = IntroState 0.0 0.0 []
+    let introState = IntroState 0.0 0.0 [] (-10.0) rng2
     let keysPressed = []
     let mode = Intro
     case time of
