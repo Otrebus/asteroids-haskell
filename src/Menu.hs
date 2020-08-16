@@ -51,11 +51,11 @@ draw window menuState = do
     clear [ColorBuffer]
 
     centerText 0.1 (Vector2d (-0.3) (0.3)) (Vector2d 0.3 0.2) "Game Paused"
-    drawText 0.08 (Vector2d (-0.23) (0.08)) "Continue"
-    drawText 0.08 (Vector2d (-0.23) (-0.02)) "Quit"
+    drawText 0.08 (Vector2d (-0.23) (0.04)) "Continue"
+    drawText 0.08 (Vector2d (-0.23) (-0.06)) "Quit"
 
     case (ms_menuChoice menuState) of
         Continue -> do
-            drawCursor (-0.37) (0.04)
+            drawCursor (-0.37) (0.08)
         Quit -> do
-            drawCursor (-0.37) (-0.06)
+            drawCursor (-0.37) (-0.04)

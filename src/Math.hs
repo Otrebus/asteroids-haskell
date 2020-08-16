@@ -130,6 +130,10 @@ rotate :: Float -> Vector2d -> Vector2d
 rotate theta v = (Matrix2d(cos theta) (-sin(theta)) (sin theta) (cos theta))#*^v
 
 
+angle :: Vector2d -> Float
+angle (Vector2d x y) = atan2 y x
+
+
 rotateAround :: Float -> Vector2d -> Vector2d -> Vector2d
 rotateAround theta o v = (Matrix2d(cos theta) (-sin(theta)) (sin theta) (cos theta))#*^(v ^-^ o) ^+^ o
 

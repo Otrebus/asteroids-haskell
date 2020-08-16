@@ -41,8 +41,8 @@ import Control.Monad.State (State, put, execState, get)
 import qualified Graphics.UI.GLFW as GLFW (Key)
 
 
-data Action = Shooting | Accelerating | Decelerating | TurningLeft | TurningRight | Escaping deriving (Show, Eq)
-data AliveState = Alive | Dead deriving (Show, Eq)
+data Action = Shooting | Accelerating | Decelerating | TurningLeft | TurningRight | Escaping | Entering deriving (Show, Eq)
+data AliveState = Alive | Exploding Float | Respawning Float deriving (Show, Eq)
 data ProgramMode = Intro | Playing | GameOver | WinLevel | Menu | Exiting deriving (Show, Eq)
 data MenuChoice = Continue | Quit | Yes | No deriving (Show, Eq)
 
@@ -117,6 +117,8 @@ data GameState = GameState {
     gs_asteroids :: [Asteroid],
     gs_time :: Float,
     gs_prevTime :: Float,
+    gs_score :: Float,
+    gs_lives :: Int,
     gs_rng :: StdGen
 } deriving (Show)
 

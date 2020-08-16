@@ -77,7 +77,9 @@ runFrame input = do
                 (GLFW.Key'D, Decelerating),
                 (GLFW.Key'F, TurningRight),
                 (GLFW.Key'Space, Shooting),
-                (GLFW.Key'Escape, Escaping)]
+                (GLFW.Key'Escape, Escaping),
+                (GLFW.Key'Enter, Entering)
+                ]
 
     let actions = map snd $ filter ((`elem` input) . fst) keyCommands
 
@@ -93,13 +95,12 @@ runFrame input = do
     put $ newState { gls_mode = if GLFW.Key'Escape `elem` newDown then Menu else Playing }
 
 
-runGameFrame :: [Action] -> State GameState ()
-runGameFrame actions = do
+updatePlayer :: Float -> [Action] -> State GameState ()
+updatePlayer delta actions = do
 
     state <- get
 
-    let GameState (playerState@(PlayerState pos dir vel angVel thrusters lastBullet aliveState)) particles polygonParticles bullets asteroids time prevTime rng = state
-    let delta = time - prevTime
+    let GameState (playerState@(PlayerState pos dir vel angVel thrusters lastBullet aliveState)) particles polygonParticles bullets asteroids time prevTime score lives rng = state
 
     let turnAcc = ((if TurningRight `elem` actions then (-angularAcc) else 0.0) +
                    (if TurningLeft `elem` actions then angularAcc else 0.0))
@@ -110,16 +111,57 @@ runGameFrame actions = do
     let newVel = if Accelerating `elem` actions then (vel ^+^ (delta * accRate)!*^dir ) else vel
     let newPos = pos ^+^ (delta!*^vel) ^+^ (0.5*delta*delta*(if Accelerating `elem` actions then accRate else 0))!*^dir
 
+    put $ state {
+        gs_playerState = (gs_playerState state) {
+            ps_position = newPos,
+            ps_direction = (turnMatrix #*^ dir),
+            ps_angularVelocity = angularVel,
+            ps_velocity = newVel
+        }
+    }
+
+    b <- detectCollisions
+    when b $ do
+        state <- get
+        put $ onPlayerState (\s -> s { ps_aliveState = Exploding time }) state
+        explodeShip
+
     addEnginesParticles actions
     when (Shooting `elem` actions) $ do
         addBullets
 
-    when (aliveState == Alive) $ do
-        b <- detectCollisions
-        when b $ do
-            state <- get
-            put $ onPlayerState (\s -> s { ps_aliveState = Dead }) state
-            explodeShip
+
+initiateRespawn :: State GameState ()
+initiateRespawn = do
+    state <- get
+    put $ onPlayerState (\ps -> ps { ps_aliveState = Respawning (gs_time state) } ) state
+
+
+finalizeRespawn :: State GameState ()
+finalizeRespawn = do
+    state <- get
+    put $ state {
+        gs_playerState = PlayerState startPos startDir startVel 0 thrusters 0.0 Alive,
+        gs_lives = (gs_lives state) - 1
+    }
+
+
+runGameFrame :: [Action] -> State GameState ()
+runGameFrame actions = do
+
+    state <- get
+
+    let GameState (playerState@(PlayerState pos dir vel angVel thrusters lastBullet aliveState)) particles polygonParticles bullets asteroids time prevTime score lives rng = state
+    let delta = time - prevTime
+
+    case aliveState of
+        Alive -> updatePlayer delta actions
+        Exploding since -> do
+            when (time - since > 1.0 && Entering `elem` actions && lives > 0) $ do
+                initiateRespawn
+        Respawning since -> do
+            when (time - since > 0.5) $ do
+                finalizeRespawn
 
     let impacts = filter (\(bul, ast, m) -> isJust m) [(bul, ast, bulletImpact ast bul delta) | ast <- asteroids, bul <- bullets]
     let impactedAsteroids = map (\(_, ast, _) -> ast) impacts
@@ -145,12 +187,6 @@ runGameFrame actions = do
     let newPolygonParticles = updatePolygonParticles time delta (gs_polygonParticles state)
 
     put $ state {
-        gs_playerState = (gs_playerState state) {
-            ps_position = newPos,
-            ps_direction = (turnMatrix #*^ dir),
-            ps_angularVelocity = angularVel,
-            ps_velocity = newVel
-        },
         gs_time = time,
         gs_particles = newParticles,
         gs_bullets = newBullets,
@@ -213,17 +249,60 @@ drawDuplicatesAsteroids vectors = do
         drawPolygon (GL.Color4 0.05 0.05 0.05 1.0) (GL.Color4 1.0 1.0 1.0 1.0) $ map (^+^ v) vectors
 
 
+drawLife :: AliveState -> Float -> Int -> Int -> IO ()
+drawLife (Respawning since) time maxLife life  = do
+    return ()
+    let x = 0.92 - ((realToFrac life - 1.0))*0.12
+    let t = 2.0*(time - since)
+    let startAng = pi/4 - angle startDir
+    let (pos, rot, scale) = if maxLife == life then (interpolate (Vector2d x 0.92) (Vector2d 0 0) t, -pi/4 + (startAng+pi/4)*t, 0.8 + (1.0-0.8)*t) else ((Vector2d x 0.92), -pi/4, 0.8)
+    let pm = map (pos ^+^) (map ((scale !*^) . (rotate (rot))) (fst playerModel))
+    drawPolygon (GL.Color4 0.00 0.00 0.00 1.0) (GL.Color4 1.0 1.0 1.0 1.0) pm
+drawLife aliveState time max life = drawPolygon (GL.Color4 0.00 0.00 0.00 1.0) (GL.Color4 1.0 1.0 1.0 1.0) pm
+    where
+        x = 0.92 - ((realToFrac life - 1.0))*0.12
+        pm = map ((Vector2d x 0.92) ^+^) (map ((0.8 !*^) . (rotate (-pi/4))) (fst playerModel))            
+
+
+drawLives :: GameState -> IO ()
+drawLives state = do
+
+    let score = gs_score state
+    let lives = gs_lives state
+    let time = gs_time state
+    let aliveState = (ps_aliveState . gs_playerState) state
+
+    mapM_ (drawLife aliveState time lives) [1..lives]
+
+    return ()
+
 draw :: GameState -> IO ()
-draw gs@(GameState playerState particles polygonParticles bullets asteroids time _ _) = do
+draw gs@(GameState playerState particles polygonParticles bullets asteroids time _ score lives _) = do
 
     clear [ColorBuffer]
 
-    drawText 0.1 (Vector2d (-0.9) 0.9) ("Number of particles: " ++ (show (length particles)))
+    drawText 0.1 (Vector2d (-0.92) 0.88) ("Score: " ++ (show . round $ score))
     drawText 0.05 (Vector2d (-0.9) (-0.9)) ("Fps: " ++ (show (1.0/(gs_time gs - gs_prevTime gs))))
 
-    when (ps_aliveState playerState == Alive) $ do
-        drawObject $ Object playerModel (ps_direction playerState) (ps_position playerState)
-        drawDuplicates $ Object playerModel (ps_direction playerState) (ps_position playerState)
+    drawLives gs
+
+    let aliveState = ps_aliveState playerState
+
+    case aliveState of
+        Alive -> do
+            drawObject $ Object playerModel (ps_direction playerState) (ps_position playerState)
+            drawDuplicates $ Object playerModel (ps_direction playerState) (ps_position playerState)
+        Exploding since -> do
+            when (time - since > 1.0) $ do
+                when (lives > 0) $ do
+                    centerText 0.1 (Vector2d (-0.3) 0.0) (Vector2d 0.3 0.0) "Press enter to respawn"
+                    return ()
+                when (lives == 0) $ do
+                    centerText 0.1 (Vector2d (-0.3) 0.0) (Vector2d 0.3 0.0) "Game Over"
+                    return ()
+                return ()
+        Respawning t -> do
+            return ()
 
     drawParticles particles
 

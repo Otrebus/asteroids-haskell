@@ -62,7 +62,7 @@ addEngineParticle time thruster speed playerPos playerDir playerVel  = do
 
 addEngineParticles action actions thrusterGetter fp start current = do
 
-    state@(GameState (PlayerState pos dir vel angVel _ _ _) _ _ _ _ time prevTime _) <- get
+    state@(GameState (PlayerState pos dir vel angVel _ _ _) _ _ _ _ time prevTime _ _ _) <- get
 
     let nextParticleTime = current + (t_emissionInterval (thrusterGetter state))
     when (action `elem` actions && nextParticleTime < time) $ do
@@ -81,7 +81,7 @@ addEngineParticles action actions thrusterGetter fp start current = do
 addEnginesParticles :: [Action] -> State GameState ()
 addEnginesParticles actions = do
 
-    gs@(GameState (PlayerState pos dir vel _ _ _ _) _ _ _ _ time prevTime _) <- get
+    gs@(GameState (PlayerState pos dir vel _ _ _ _) _ _ _ _ time prevTime _ _ _) <- get
 
     let thfun = (ps_thrusters . gs_playerState)
     let engines = [(Accelerating, e_main . thfun, onMainThruster),
@@ -99,7 +99,7 @@ addEnginesParticles actions = do
 addBullets :: State GameState ()
 addBullets = do
     state <- get
-    let GameState (playerState@(PlayerState pos dir vel _ thrusters lastBullet aliveState)) _ _ bullets _ time _ _ = state
+    let GameState (playerState@(PlayerState pos dir vel _ thrusters lastBullet aliveState)) _ _ bullets _ time _ _ _ _ = state
     when (lastBullet + fireRate < time) $ do
         let bulletPos = pos ^+^ rebase dir plT
         put state {
@@ -244,7 +244,7 @@ explodeShip = do
 
     state <- get
 
-    let GameState playerState particles polygonParticles bullets asteroids time prevTime rng = state
+    let GameState playerState particles polygonParticles bullets asteroids time prevTime score lives rng = state
 
     let (Vector2d a b) = ps_direction playerState
     let vel = ps_velocity playerState
@@ -282,10 +282,13 @@ annihilateAsteroids = do
     asteroids <- liftM gs_asteroids get
 
     remainder <- filterM (\a -> do
-        let lives = polyArea (a_vertices a) > 0.001
-        when (not lives) $ explodeAsteroid a
-        return lives
-        ) asteroids
+        let area = polyArea (a_vertices a)
+        let lives = area > 0.001
+        when (not lives) $ do
+            state <- get
+            put $ state { gs_score = (gs_score state) + area*10000.0 }
+            explodeAsteroid a
+        return lives) asteroids
 
     state <- get
     put $ onAsteroids (\a -> remainder) state
@@ -307,7 +310,7 @@ detectCollision ps vs dir = or [intersects (p, p ^+^ dir) (v1, v2) | p <- ps, (v
 detectCollisions :: State GameState (Bool)
 detectCollisions = do
     state <- get
-    let GameState (playerState@(PlayerState pos dir vel angVel thrusters lastBullet _)) particles polygonParticles bullets asteroids time prevTime rng = state
+    let GameState (playerState@(PlayerState pos dir vel angVel thrusters lastBullet _)) particles polygonParticles bullets asteroids time prevTime _ _ rng = state
 
     let (verts, tris) = playerModel
 
