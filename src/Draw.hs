@@ -94,6 +94,14 @@ runFrame input = do
 
     put $ newState { gls_mode = if GLFW.Key'Escape `elem` newDown then Menu else Playing }
 
+    state <- get
+    
+    case (ps_aliveState . gs_playerState . gls_gameState) state of
+        GameOver _ -> do
+            when (GLFW.Key'Enter `elem` newDown) $ do
+                put $ state { gls_mode = Restarting }
+        _ -> return ()
+    
 
 updatePlayer :: Float -> [Action] -> State GameState ()
 updatePlayer delta actions = do
@@ -159,9 +167,12 @@ runGameFrame actions = do
         Exploding since -> do
             when (time - since > 1.0 && Entering `elem` actions && lives > 0) $ do
                 initiateRespawn
+            when (lives == 0) $ do
+                put $ onPlayerState (\ps -> ps { ps_aliveState = GameOver time }) state
         Respawning since -> do
             when (time - since > 0.5) $ do
                 finalizeRespawn
+        _ -> return ()
 
     let impacts = filter (\(bul, ast, m) -> isJust m) [(bul, ast, bulletImpact ast bul delta) | ast <- asteroids, bul <- bullets]
     let impactedAsteroids = map (\(_, ast, _) -> ast) impacts
@@ -297,12 +308,14 @@ draw gs@(GameState playerState particles polygonParticles bullets asteroids time
                 when (lives > 0) $ do
                     centerText 0.1 (Vector2d (-0.3) 0.0) (Vector2d 0.3 0.0) "Press enter to respawn"
                     return ()
-                when (lives == 0) $ do
-                    centerText 0.1 (Vector2d (-0.3) 0.0) (Vector2d 0.3 0.0) "Game Over"
-                    return ()
                 return ()
-        Respawning t -> do
+        GameOver since -> do
+            centerText 0.15 (Vector2d (-0.3) 0.15) (Vector2d 0.3 0.0) "Game Over"
+            centerText 0.09 (Vector2d (-0.3) (-0.15)) (Vector2d 0.3 0.0) "Press enter to restart"
             return ()
+        _ -> do
+            return ()
+        
 
     drawParticles particles
 

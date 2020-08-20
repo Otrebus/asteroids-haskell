@@ -42,8 +42,8 @@ import qualified Graphics.UI.GLFW as GLFW (Key)
 
 
 data Action = Shooting | Accelerating | Decelerating | TurningLeft | TurningRight | Escaping | Entering deriving (Show, Eq)
-data AliveState = Alive | Exploding Float | Respawning Float deriving (Show, Eq)
-data ProgramMode = Intro | Playing | GameOver | WinLevel | Menu | Exiting deriving (Show, Eq)
+data AliveState = Alive | Exploding Float | Respawning Float | GameOver Float deriving (Show, Eq)
+data ProgramMode = Intro | Playing | Menu | Exiting | Restarting deriving (Show, Eq)
 data MenuChoice = Continue | Quit | Yes | No deriving (Show, Eq)
 
 data Object = Object (Vertices, [Vertices]) Direction Position

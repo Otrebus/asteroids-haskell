@@ -65,6 +65,8 @@ mainLoop :: GLFW.Window -> ProgramState -> Time -> IO ()
 mainLoop w gls@(ProgramState gameState menuState introState mode input) prevTime = do
     close <- GLFW.windowShouldClose w
 
+    is <- initState
+
     unless (close || mode == Exiting) $ do
 
         GLFW.swapBuffers w
@@ -75,16 +77,18 @@ mainLoop w gls@(ProgramState gameState menuState introState mode input) prevTime
             Playing -> Draw.draw gameState
             Menu -> Menu.draw w menuState
             Intro -> Intro.draw w introState
+            _ -> return ()
 
         newTime <- GLFW.getTime
         case newTime of
             Nothing -> mainLoop w gls prevTime
             Just time -> let 
-                
+
                 newState = case mode of
                     Playing -> (execState (Draw.runFrame input) newTimeState) { gls_keysPressed = input }
                     Menu -> (execState (Menu.runFrame input) newTimeState) { gls_keysPressed = input }
                     Intro -> (execState (Intro.runFrame input) newTimeState) { gls_keysPressed = input }
+                    Restarting -> (execState (Draw.runFrame input) newTimeState) { gls_gameState = is }
 
                 newTimeState = case mode of
                     Playing -> gls { gls_gameState = gameState { gs_time = ((gs_time . gls_gameState) gls) + (realToFrac time) - prevTime, gs_prevTime = (gs_time . gls_gameState) gls } }
@@ -94,6 +98,13 @@ mainLoop w gls@(ProgramState gameState menuState introState mode input) prevTime
                 in mainLoop w newState (realToFrac time)
 
 
+initState = do
+    rng <- newStdGen
+    let poly = (evalRand (randomPolygon 13 (Vector2d 0.21 0.21) 0.5 0.5) rng)
+    let asteroid = Asteroid 0.25 (Vector2d 0.0 0.0) poly
+    return $ GameState (PlayerState startPos startDir startVel 0 thrusters 0.0 Alive) [] [] [] [asteroid] 0.0 0.0 0.0 3 rng
+
+
 main :: IO ()
 main = do
     window <- initialize "Asteroids"
@@ -101,12 +112,10 @@ main = do
     GLFW.setWindowAspectRatio window $ Just (1, 1)
     GLFW.setStickyKeysInputMode window GLFW.StickyKeysInputMode'Enabled
 
-    rng <- newStdGen
     rng2 <- newStdGen
-    let poly = (evalRand (randomPolygon 13 (Vector2d 0.21 0.21) 0.5 0.5) rng)
-    let asteroid = Asteroid 0.25 (Vector2d 0.0 0.0) poly
     let menuState = MenuState Continue
-    let gameState = GameState (PlayerState startPos startDir startVel 0 thrusters 0.0 Alive) [] [] [] [asteroid] 0.0 0.0 0.0 3 rng
+    
+    gameState <- initState
     let introState = IntroState 0.0 0.0 [] (-10.0) rng2
     let keysPressed = []
     let mode = Intro

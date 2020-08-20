@@ -1,6 +1,4 @@
 * Score
-* Death screen
-* Intro screen
 * Level progression
 * Menu
 * Sounds?

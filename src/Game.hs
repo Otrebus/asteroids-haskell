@@ -186,7 +186,7 @@ explodeNewAsteroids time [] n = return ()
 explodeNewAsteroids time (x:y:zs) n = do
 
     let vs = a_vertices x
-    addExplosion time (head vs) (normalize ((head vs) ^-^ (last vs))) (a_velocity x) 100 2.5 1.5
+    addExplosion time (head vs) (normalize ((head vs) ^-^ (last vs))) (a_velocity x) 100 1.5 1.5
     addExplosion time (last vs) (normalize ((last vs) ^-^ (head vs))) (a_velocity y) 15 1 1.5
 
     explodeNewAsteroids time zs n
