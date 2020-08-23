@@ -21,16 +21,18 @@ executable asteroids-exe
   main-is: Main.hs
   other-modules:
       Paths_asteroids
+      Chars
       Font
       Draw
-      Game
+      Update
       Menu
       Intro
       State
       Math
+      Constants
       Player
   hs-source-dirs:
-      src
+      src, src/Game, src/Intro, src/Utils, src/Menu
   ghc-options: -threaded -rtsopts -with-rtsopts=-N
   build-depends:
     base >=4.7 && <5

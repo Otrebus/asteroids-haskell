@@ -1,24 +1,16 @@
 module Main where
 
-import Debug.Trace
+import Update
 import System.IO (hPutStrLn, stderr)
-import Control.Monad
-
-
 import Player
-import Data.List (sort, sortOn)
 import System.Exit (exitFailure)
 import Math
-import qualified Graphics.Rendering.OpenGL as GL hiding (get, rotate)
+import qualified Graphics.Rendering.OpenGL as GL
 import State
-import Control.Monad.State (State, put, execState, get)
-import Font (chars)
-import Data.Maybe
-import qualified Graphics.UI.GLFW as GLFW
-import Debug.Trace
+import Control.Monad.State (State, execState)
 import Control.Monad.Random
+import qualified Graphics.UI.GLFW as GLFW
 import System.Random
-import Font
 import qualified Draw
 import qualified Menu
 import qualified Intro
@@ -52,11 +44,13 @@ initialize title = do
               return window
 
 
+getInput :: GLFW.Window -> IO [GLFW.Key]
 getInput window = filterM (isPressed window) keys
 
-isPressed window key = do
-    a <- GLFW.getKey window key 
-    return (a == GLFW.KeyState'Pressed)
+
+isPressed :: GLFW.Window -> GLFW.Key -> IO Bool
+isPressed window key = liftM2 (==) (GLFW.getKey window key) (return GLFW.KeyState'Pressed)
+
 
 keys = [GLFW.Key'E, GLFW.Key'S, GLFW.Key'D, GLFW.Key'F, GLFW.Key'Space, GLFW.Key'Escape, GLFW.Key'Enter]
 
@@ -65,7 +59,7 @@ mainLoop :: GLFW.Window -> ProgramState -> Time -> IO ()
 mainLoop w gls@(ProgramState gameState menuState introState mode input) prevTime = do
     close <- GLFW.windowShouldClose w
 
-    is <- initState
+    let is = initState 1 0.0 ((gs_rng . gls_gameState) gls)
 
     unless (close || mode == Exiting) $ do
 
@@ -85,10 +79,10 @@ mainLoop w gls@(ProgramState gameState menuState introState mode input) prevTime
             Just time -> let 
 
                 newState = case mode of
-                    Playing -> (execState (Draw.runFrame input) newTimeState) { gls_keysPressed = input }
+                    Playing -> (execState (Update.runFrame input) newTimeState) { gls_keysPressed = input }
                     Menu -> (execState (Menu.runFrame input) newTimeState) { gls_keysPressed = input }
                     Intro -> (execState (Intro.runFrame input) newTimeState) { gls_keysPressed = input }
-                    Restarting -> (execState (Draw.runFrame input) newTimeState) { gls_gameState = is }
+                    Restarting -> (execState (Update.runFrame input) newTimeState) { gls_gameState = is }
 
                 newTimeState = case mode of
                     Playing -> gls { gls_gameState = gameState { gs_time = ((gs_time . gls_gameState) gls) + (realToFrac time) - prevTime, gs_prevTime = (gs_time . gls_gameState) gls } }
@@ -98,13 +92,6 @@ mainLoop w gls@(ProgramState gameState menuState introState mode input) prevTime
                 in mainLoop w newState (realToFrac time)
 
 
-initState = do
-    rng <- newStdGen
-    let poly = (evalRand (randomPolygon 13 (Vector2d 0.21 0.21) 0.5 0.5) rng)
-    let asteroid = Asteroid 0.25 (Vector2d 0.0 0.0) poly
-    return $ GameState (PlayerState startPos startDir startVel 0 thrusters 0.0 Alive) [] [] [] [asteroid] 0.0 0.0 0.0 3 rng
-
-
 main :: IO ()
 main = do
     window <- initialize "Asteroids"
@@ -112,10 +99,11 @@ main = do
     GLFW.setWindowAspectRatio window $ Just (1, 1)
     GLFW.setStickyKeysInputMode window GLFW.StickyKeysInputMode'Enabled
 
-    rng2 <- newStdGen
+    (rng, rng2) <- liftM2 (,) newStdGen newStdGen
+
     let menuState = MenuState Continue
     
-    gameState <- initState
+    let gameState = initState 1 0.0 rng
     let introState = IntroState 0.0 0.0 [] (-10.0) rng2
     let keysPressed = []
     let mode = Intro

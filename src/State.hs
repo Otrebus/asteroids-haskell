@@ -34,16 +34,19 @@ module State (
     onStars,
     Object(..),
     rndFloat,
-    rndInt) where
+    rndInt,
+    initState) where
 import Math
+import Player
 import System.Random
 import Control.Monad.State (State, put, execState, get)
 import qualified Graphics.UI.GLFW as GLFW (Key)
+import Control.Monad.Random
 
 
 data Action = Shooting | Accelerating | Decelerating | TurningLeft | TurningRight | Escaping | Entering deriving (Show, Eq)
-data AliveState = Alive | Exploding Float | Respawning Float | GameOver Float deriving (Show, Eq)
-data ProgramMode = Intro | Playing | Menu | Exiting | Restarting deriving (Show, Eq)
+data AliveState = Alive | Exploding Float | Respawning Float | GameOver Float | Winning Float deriving (Show, Eq)
+data ProgramMode = Intro | Playing | Menu | Exiting | Restarting | Progressing deriving (Show, Eq)
 data MenuChoice = Continue | Quit | Yes | No deriving (Show, Eq)
 
 data Object = Object (Vertices, [Vertices]) Direction Position
@@ -74,24 +77,6 @@ data Asteroid = Asteroid {
 } deriving (Show, Eq)
 
 
-data Thrusters = Thrusters {
-    e_main :: Thruster,
-    e_reverse :: Thruster,
-    e_topleft :: Thruster,
-    e_topright :: Thruster,
-    e_bottomleft :: Thruster,
-    e_bottomright :: Thruster
-} deriving (Show)
-
-
-data Thruster = Thruster {
-    t_lastEmitted :: Float,
-    t_emissionInterval :: Float,
-    t_position :: Vector2d,
-    t_direction :: Vector2d
-} deriving (Show)
-
-
 data Particle = Particle {
     p_position :: Position,
     p_velocity :: Velocity,
@@ -119,6 +104,7 @@ data GameState = GameState {
     gs_prevTime :: Float,
     gs_score :: Float,
     gs_lives :: Int,
+    gs_level :: Int,
     gs_rng :: StdGen
 } deriving (Show)
 
@@ -219,3 +205,10 @@ rndFloat min max = do
     let (value, newGenerator) = randomR (min,max) (gs_rng state)
     put (state { gs_rng = newGenerator})
     return value
+
+
+initState :: Int -> Float -> StdGen -> GameState
+initState level score rng =
+    let poly = (evalRand (randomPolygon 13 (Vector2d 0.21 0.21) ((realToFrac level)*0.05) ((realToFrac level)*0.05)) rng)
+        asteroid = Asteroid 0.25 (Vector2d 0.0 0.0) poly
+        in GameState (PlayerState startPos startDir startVel 0 thrusters score Alive) [] [] [] [asteroid] 0.0 0.0 0.0 3 1 rng

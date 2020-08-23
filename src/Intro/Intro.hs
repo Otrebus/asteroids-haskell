@@ -2,17 +2,12 @@ module Intro where
 
 import qualified Graphics.UI.GLFW as GLFW
 import qualified Graphics.Rendering.OpenGL as GL hiding (get)
-import Graphics.Rendering.OpenGL (vertex, clear, ClearBuffer(ColorBuffer), renderPrimitive, PrimitiveMode(Lines, Points, QuadStrip, TriangleStrip, LineLoop, TriangleFan))
-
+import Graphics.Rendering.OpenGL (vertex, clear, ClearBuffer(ColorBuffer), PrimitiveMode(Points), renderPrimitive)
 import State hiding (rndFloat)
-import Graphics.Rendering.OpenGL (ClearBuffer(ColorBuffer), clear)
-import Graphics.Rendering.OpenGL (vertex, clear, ClearBuffer(ColorBuffer), renderPrimitive, PrimitiveMode(Lines, Points, QuadStrip, TriangleStrip, LineLoop, TriangleFan))
-
 import Math
 import System.Random
 import Control.Monad.State
 import Font
-import Debug.Trace
 
 
 rndFloat :: Float -> Float -> State IntroState (Float)
@@ -70,12 +65,9 @@ runIntroFrame :: State IntroState ()
 runIntroFrame = do
 
     state <- get
-
-    trace "hi" $ return ()
-
     spawnStars (is_lastStar state) (is_time state)
     state <- get
-    put $  (onStars ((filter (\s ->  (is_time state) - (st_startTime s) < 10.0)))) state
+    put $ (onStars ((filter (\s ->  (is_time state) - (st_startTime s) < 10.0)))) state
     
     return ()
 

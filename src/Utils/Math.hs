@@ -47,7 +47,6 @@ infixl 6 ^%^ -- "Cross product"
 (^%^) :: Vector2d -> Vector2d -> Float
 (^%^) (Vector2d a b) (Vector2d c d) = a*d - b*c
 
-
 len :: Vector2d -> Float
 len (Vector2d x y) = sqrt (x*x + y*y)
 
@@ -78,7 +77,8 @@ idMatrix = Matrix2d 1.0 0.0 0.0 1.0
 getTurnMatrix :: Angle -> Matrix2d
 getTurnMatrix theta = Matrix2d (cos theta) (-sin(theta)) (sin theta) (cos theta)
 
-bbox vs = (minimum . (map xComp) $ vs, minimum . (map yComp) $ vs, maximum . (map xComp) $ vs, maximum . (map yComp) $ vs)
+bbox vs = (minimum . (map xComp) $ vs, minimum . (map yComp) $ vs,
+           maximum . (map xComp) $ vs, maximum . (map yComp) $ vs)
 
 
 randomPolygon :: Int -> Vector2d -> Float -> Float -> Rand StdGen [Vector2d]
@@ -118,8 +118,6 @@ randomPolygon n pos width height = do
             (as, bs) <- rndSplit xs
             c <- getRandom
             return (if c then (x:as, bs) else (as, x:bs))
-        -- The above should be equal to this but generates a polygon way too large, why?
-        -- rndSplit = foldM (\(as, bs) x -> (getRandom >>= (\r -> return (if r then (x:as, bs) else (as, x:bs))))) ([], [])
 
 
 rebase :: Vector2d -> Vector2d -> Vector2d
@@ -177,6 +175,10 @@ intersect (Vector2d p1x p1y, Vector2d p2x p2y) (Vector2d v1x v1y, Vector2d v2x v
     where
         a = p1x - p2x; b = v2x - v1x; c = p1y - p2y; d = v2y - v1y; e = p1x - v1x; f = p1y - v1y
         s = (e*d - b*f)/(a*d - b*c); t = (a*f - e*c)/(a*d - b*c)
+
+
+interpolate :: Vector2d -> Vector2d -> Float -> Vector2d
+interpolate vec1 vec2 t = vec1 ^+^ ((vec2 ^-^ vec1) ^*! t)
 
 
 intersects a b = let (s, t) = intersect a b in t >= 0 && t <= 1 && s >= 0.0 && s <= 1
