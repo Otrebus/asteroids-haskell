@@ -1,5 +1,6 @@
 module Menu where
 
+import Constants
 import State
 import Graphics.Rendering.OpenGL (ClearBuffer(ColorBuffer), clear)
 import qualified Graphics.Rendering.OpenGL as GL hiding (get, rotate)
@@ -9,7 +10,6 @@ import Math
 import Player
 import Draw
 import qualified Graphics.UI.GLFW as GLFW
-import Debug.Trace
 
 
 runFrame :: [GLFW.Key] -> State ProgramState ()
@@ -19,8 +19,6 @@ runFrame input = do
 
     let prevPressed = gls_keysPressed state
     let newDown = filter (\k -> not (k `elem` prevPressed)) input
-
-    trace (show newDown) $ return ()
 
     case ((ms_menuChoice . gls_menuState) state) of
         Continue -> do
@@ -41,7 +39,7 @@ runFrame input = do
 
 drawCursor :: Float -> Float -> IO ()
 drawCursor x y = do
-    drawPolygon (GL.Color4 0.00 0.00 0.00 1.0) (GL.Color4 1.0 1.0 1.0 1.0) pm
+    drawPolygon black white pm
     where
         pm = map ((0.8 !*^) . ((Vector2d x y) ^+^)) (map (rotate (-pi/2)) (fst playerModel))
 

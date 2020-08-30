@@ -35,9 +35,10 @@ spawnStars lastStar time = do
         let randomStar = Star (Vector2d x y) nextStar
 
         state <- get
-        put $ (onStars) ((:) randomStar) state
-        state <- get
-        put $ state { is_lastStar = nextStar }
+        put $ state {
+            is_stars = randomStar:(is_stars state),
+            is_lastStar = nextStar
+        }
 
         spawnStars nextStar time
 
@@ -74,21 +75,20 @@ runIntroFrame = do
 
 drawStars :: [Star] -> Time -> IO ()
 drawStars particles time = do
-    renderPrimitive Points $ forM_ particles renderStar where
-        renderStar s = do
-            let Star (Vector2d x y) spawnTime = s
+    renderPrimitive Points $ forM_ particles $ \s -> do
+        let Star (Vector2d x y) spawnTime = s
 
-            let c = color (time - spawnTime)
-            GL.color $ GL.Color4 c c c c
+        let c = color (time - spawnTime)
+        GL.color $ GL.Color4 c c c c
 
-            let z = 10.0 - (time - spawnTime)
-            vertex (toVertex $ Vector2d (x/z) (y/z))
+        let z = 10.0 - (time - spawnTime)
+        vertex (toVertex $ Vector2d (x/z) (y/z))
 
-            where
-                color t
-                    | t < 2.0 = 0.65*t/2.0
-                    | t > 9.0 = 0.65*(10-t)
-                    | otherwise = 0.65
+    where
+    color t
+        | t < 2.0 = 0.65*t/2.0
+        | t > 9.0 = 0.65*(10-t)
+        | otherwise = 0.65
 
 
 draw :: GLFW.Window -> IntroState -> IO ()

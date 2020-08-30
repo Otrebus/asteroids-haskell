@@ -43,21 +43,17 @@ updatePolygonParticles time deltaT particles = newParticles
                 
 
 updateBullets :: Time -> Time -> [Bullet] -> [Bullet]
-updateBullets time deltaT = filter ((>time) . b_lifeTime) . map (\(Bullet pos dir vel life) -> (Bullet (pos ^+^ (deltaT)!*^vel) dir vel life ))
+updateBullets time deltaT = filter ((>time) . b_lifeTime) . map updbul
+    where updbul (Bullet pos dir vel life) = (Bullet (pos ^+^ (deltaT)!*^vel) dir vel life )
 
 
 normalizePositions :: State GameState ()
 normalizePositions = do
-    state <- get
-    put $ (onPlayerState . onPlayerPos) (wrap) state
-    state <- get
-    put $ onParticles (map (onParticlePos wrap)) state
-    state <- get
-    put $ onBullets (map (onBulletPos wrap)) state
-    state <- get
-    put $ onAsteroids (map (onPolygonVertices wrapVertices )) state
-    state <- get
-    put $ onPolygonParticles (map (onPolygonParticleVertices wrapVertices )) state
+    get >>= put . (onPlayerState . onPlayerPos) wrap
+    get >>= put . (onParticles (map (onParticlePos wrap)))
+    get >>= put . (onBullets (map (onBulletPos wrap)))
+    get >>= put . (onAsteroids (map (onPolygonVertices wrapVertices )))
+    get >>= put . (onPolygonParticles (map (onPolygonParticleVertices wrapVertices )))
 
 
 addExplosionParticle :: Time -> Vector2d -> Vector2d -> Vector2d -> Float -> Float -> State GameState (Particle)
@@ -96,12 +92,21 @@ addEngineParticle time thruster speed playerPos playerDir playerVel  = do
     s <- rndFloat 0.0 0.15
     let newnDir = rotate (x*y) newDir
     state <- get
-    put (state { gs_particles = ((Particle (playerPos ^+^ newPos) (playerVel ^+^ ((newnDir)^*!(speed + s))) time (time + 2.5 + 0.2) (0.5 + q))):(gs_particles state) } )
+
+    let pos = (playerPos ^+^ newPos)
+    let vel = (playerVel ^+^ ((newnDir)^*!(speed + s)))
+    let lifeTime = (time + 2.5 + 0.2)
+    let brightness = (0.5 + q)
+
+    put $ onParticles ((:) (Particle pos vel time lifeTime brightness)) state
 
 
 addEngineParticles action actions thrusterGetter fp start current = do
 
-    state@(GameState (PlayerState pos dir vel angVel _ _ _) _ _ _ _ time prevTime _ _ _ _) <- get
+    state <- get
+
+    let time = gs_time state
+    let (PlayerState pos dir vel angVel _ _ _) = gs_playerState state
 
     let nextParticleTime = current + (t_emissionInterval (thrusterGetter state))
     when (action `elem` actions && nextParticleTime < time) $ do
@@ -177,18 +182,6 @@ bulletImpact asteroid bullet delta = if impacts /= [] then Just (v, t) else Noth
           centroid = polyCentroid (vertices)
           vs = zip vertices ((tail . cycle) vertices)
           vertices = a_vertices asteroid
-
-
--- bulletImpact :: Asteroid -> Bullet -> Float -> Maybe ((Vector2d, Vector2d), Float)
--- bulletImpact asteroid bullet delta = if impact then Just (mini, t) else Nothing
---     where 
---           mini = if impact then (head is) else (undefined, undefined)
---           (s, t) = if impact then intersect (b1, b2) (head is) else (0, 0)
---           impact = (not . null) is
---           is = filter (\v -> intersects (b1, b2) v) vs
---           (b1, b2) = (b_position bullet, (b_position bullet) ^+^ ((b_velocity bullet) ^-^ (a_velocity asteroid))^*!delta)
---           vs = zip vertices ((tail . cycle) vertices)
---           vertices = a_vertices asteroid
 
 
 maprest :: [a] -> [[a]]

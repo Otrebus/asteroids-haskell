@@ -85,8 +85,18 @@ mainLoop w gls@(ProgramState gameState menuState introState mode input) prevTime
                     Restarting -> (execState (Update.runFrame input) newTimeState) { gls_gameState = is }
 
                 newTimeState = case mode of
-                    Playing -> gls { gls_gameState = gameState { gs_time = ((gs_time . gls_gameState) gls) + (realToFrac time) - prevTime, gs_prevTime = (gs_time . gls_gameState) gls } }
-                    Intro -> gls { gls_introState = introState { is_time = ((is_time . gls_introState) gls) + (realToFrac time) - prevTime, is_prevTime = (is_time . gls_introState) gls } }
+                    Playing -> gls {
+                        gls_gameState = gameState {
+                                gs_time = ((gs_time . gls_gameState) gls) + (realToFrac time) - prevTime,
+                                gs_prevTime = (gs_time . gls_gameState) gls
+                            }
+                        }
+                    Intro -> gls {
+                        gls_introState = introState {
+                                is_time = ((is_time . gls_introState) gls) + (realToFrac time) - prevTime,
+                                is_prevTime = (is_time . gls_introState) gls
+                            }
+                        }
                     _ -> gls
 
                 in mainLoop w newState (realToFrac time)

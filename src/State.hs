@@ -42,7 +42,6 @@ import System.Random
 import Control.Monad.State (State, put, execState, get)
 import qualified Graphics.UI.GLFW as GLFW (Key)
 import Control.Monad.Random
-import Debug.Trace
 
 
 data Action = Shooting | Accelerating | Decelerating | TurningLeft | TurningRight | Escaping | Entering deriving (Show, Eq)
@@ -211,7 +210,7 @@ rndFloat min max = do
 initAsteroids :: Int -> Rand StdGen [Asteroid]
 initAsteroids n = do
 
-    let size = 0.1*rtf n
+    let size = 0.15*rtf n
 
     t0 <- getRandomR (0, 2*pi)
 
@@ -230,5 +229,5 @@ initAsteroids n = do
 
 initState :: Int -> Float -> StdGen -> GameState
 initState level score rng =
-    let (asteroids, rnd) = runRand (initAsteroids level) rng
-    in GameState (PlayerState startPos startDir startVel 0 thrusters score Alive) [] [] [] asteroids 0.0 0.0 0.0 3 level rng
+    let (asteroids, rnd) = runRand (initAsteroids 2) rng
+    in GameState (PlayerState startPos startDir startVel 0 thrusters score Alive) [] [] [] asteroids 0.0 0.0 0 3 2 rng

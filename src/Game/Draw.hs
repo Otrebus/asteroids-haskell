@@ -120,7 +120,7 @@ draw gs@(GameState playerState particles polygonParticles bullets asteroids time
     clear [ColorBuffer]
 
     drawText 0.1 (Vector2d (-0.92) 0.88) ("Score: " ++ (show . round $ score))
-    drawText 0.05 (Vector2d (-0.9) (-0.9)) ("Fps: " ++ (show (1.0/(gs_time gs - gs_prevTime gs))))
+    -- drawText 0.05 (Vector2d (-0.9) (-0.9)) ("Fps: " ++ (show (1.0/(gs_time gs - gs_prevTime gs))))
 
     drawLives gs
 

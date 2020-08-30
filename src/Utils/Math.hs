@@ -3,7 +3,6 @@ module Math where
 import Graphics.Rendering.OpenGL hiding (Angle)
 import Control.Monad.Random
 import Data.List (sort, sortOn)
-import Debug.Trace
 import Control.Applicative
 import Data.Fixed (mod')
 
