@@ -457,8 +457,6 @@ runGameFrame actions = do
 
     state <- get
 
-    trace (show ((ps_aliveState . gs_playerState) state)) (return ())
-
     let GameState (playerState@(PlayerState pos dir vel angVel thrusters lastBullet aliveState)) particles polygonParticles bullets asteroids time prevTime score lives level rng = state
     let delta = time - prevTime
 

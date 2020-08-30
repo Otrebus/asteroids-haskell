@@ -42,6 +42,7 @@ import System.Random
 import Control.Monad.State (State, put, execState, get)
 import qualified Graphics.UI.GLFW as GLFW (Key)
 import Control.Monad.Random
+import Debug.Trace
 
 
 data Action = Shooting | Accelerating | Decelerating | TurningLeft | TurningRight | Escaping | Entering deriving (Show, Eq)
@@ -207,8 +208,27 @@ rndFloat min max = do
     return value
 
 
+initAsteroids :: Int -> Rand StdGen [Asteroid]
+initAsteroids n = do
+
+    let size = 0.1*rtf n
+
+    t0 <- getRandomR (0, 2*pi)
+
+    let poses = [Vector2d (cos a) (sin a) | i <- [1..n], let a = t0 + rtf i*2.0*pi/rtf n]
+
+    forM poses $ \pos -> do
+        dist <- getRandomR (max 0.4 (size*1.2), 0.8)
+        poly <- (randomPolygon 13 (dist!*^pos) size size)
+        velRot <- getRandomR (-0.4, 0.4)
+        dir <- fromList [(1, 0.5), (-1, 0.5)]
+        let vel = dir !*^ rotate velRot (0.15!*^((normalize . ortho) pos))
+        return (Asteroid 0.25 vel poly)
+
+    where rtf = realToFrac
+
+
 initState :: Int -> Float -> StdGen -> GameState
 initState level score rng =
-    let poly = (evalRand (randomPolygon 13 (Vector2d 0.21 0.21) ((realToFrac level)*0.05) ((realToFrac level)*0.05)) rng)
-        asteroid = Asteroid 0.25 (Vector2d 0.0 0.0) poly
-        in GameState (PlayerState startPos startDir startVel 0 thrusters score Alive) [] [] [] [asteroid] 0.0 0.0 0.0 3 1 rng
+    let (asteroids, rnd) = runRand (initAsteroids level) rng
+    in GameState (PlayerState startPos startDir startVel 0 thrusters score Alive) [] [] [] asteroids 0.0 0.0 0.0 3 level rng

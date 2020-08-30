@@ -47,6 +47,9 @@ infixl 6 ^%^ -- "Cross product"
 (^%^) :: Vector2d -> Vector2d -> Float
 (^%^) (Vector2d a b) (Vector2d c d) = a*d - b*c
 
+ortho :: Vector2d -> Vector2d
+ortho (Vector2d x y) = Vector2d y (-x)
+
 len :: Vector2d -> Float
 len (Vector2d x y) = sqrt (x*x + y*y)
 

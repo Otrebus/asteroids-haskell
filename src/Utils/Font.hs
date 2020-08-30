@@ -5,6 +5,7 @@ import Control.Monad
 import Data.Char (ord)
 import Graphics.Rendering.OpenGL (vertex, clear, ClearBuffer(ColorBuffer), renderPrimitive, PrimitiveMode(Lines, Points, LineStrip))
 import Chars (chars)
+import Constants
 
 
 drawChar :: Float -> Vector2d -> Char -> IO Vector2d
@@ -12,7 +13,7 @@ drawChar size pos@(Vector2d x y) c = do
     let (w, vs) = chars !! (ord c - 32)
     let conv = (pos ^+^) . (size/32.0 !*^) . (uncurry Vector2d)
 
-    GL.color $ GL.Color4 1 1 1 (1 :: GL.GLfloat)
+    GL.color $ white
     forM_ (map (map (toVertex . conv)) vs) $ renderPrimitive LineStrip <$> mapM_ vertex
 
     return $ Vector2d (x + (size*w)/32.0) y
