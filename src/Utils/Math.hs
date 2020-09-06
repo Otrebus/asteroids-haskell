@@ -1,4 +1,4 @@
-module Math where
+module Utils.Math where
 
 import Graphics.Rendering.OpenGL hiding (Angle)
 import Control.Monad.Random

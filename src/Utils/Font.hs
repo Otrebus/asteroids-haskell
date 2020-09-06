@@ -1,11 +1,11 @@
-module Font(chars, drawText, centerText) where
-import Math
+module Utils.Font(chars, drawText, centerText) where
+import Utils.Math
 import qualified Graphics.Rendering.OpenGL as GL
 import Control.Monad
 import Data.Char (ord)
-import Graphics.Rendering.OpenGL (vertex, clear, ClearBuffer(ColorBuffer), renderPrimitive, PrimitiveMode(Lines, Points, LineStrip))
-import Chars (chars)
-import Constants
+import Graphics.Rendering.OpenGL (vertex, renderPrimitive, PrimitiveMode(LineStrip))
+import Utils.Chars (chars)
+import Utils.Rendering
 
 
 drawChar :: Float -> Vector2d -> Char -> IO Vector2d

@@ -21,19 +21,23 @@ executable asteroids-exe
   main-is: Main.hs
   other-modules:
       Paths_asteroids
-      Chars
-      Font
-      Draw
-      Update
-      Menu
-      Intro
+      Utils.Chars
+      Utils.Font
+      Game.Draw
+      Game.Update
+      Game.Effects
+      Game.Asteroids
+      Intro.Draw
+      Intro.Update
+      Menu.Draw
+      Menu.Update
       State
-      Math
-      Constants
+      Utils.Math
+      Utils.Rendering
       Player
   hs-source-dirs:
-      src, src/Game, src/Intro, src/Utils, src/Menu
-  ghc-options: -threaded -rtsopts -with-rtsopts=-N
+      src
+  ghc-options: -threaded -rtsopts -with-rtsopts=-N -Wunused-imports -fforce-recomp
   build-depends:
     base >=4.7 && <5
     , GLFW-b == 3.3.0.0

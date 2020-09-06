@@ -1,4 +1,4 @@
-module Chars where
+module Utils.Chars where
 
 -- Hershey vector font ascii 32 to 126, adapted from the C listing at
 -- https://web.archive.org/web/20191231161857/http://paulbourke.net/dataformats/hershey/

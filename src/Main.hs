@@ -1,23 +1,19 @@
 module Main where
 
-import Update
 import System.IO (hPutStrLn, stderr)
-import Player
 import System.Exit (exitFailure)
-import Math
+import Utils.Math
 import qualified Graphics.Rendering.OpenGL as GL
 import State
-import Control.Monad.State (State, execState)
+import Control.Monad.State (execState)
 import Control.Monad.Random
 import qualified Graphics.UI.GLFW as GLFW
-import System.Random
-import qualified Draw
-import qualified Menu
-import qualified Intro
-
-
-errorCallback :: GLFW.ErrorCallback
-errorCallback _ = hPutStrLn stderr
+import Intro.Update
+import Menu.Update
+import Game.Update
+import Game.Draw
+import Menu.Draw
+import Intro.Draw
 
 
 resizeWindow :: GLFW.WindowSizeCallback
@@ -27,7 +23,7 @@ resizeWindow win w h = do
 
 initialize :: String -> IO GLFW.Window
 initialize title = do
-  GLFW.setErrorCallback (Just errorCallback)
+  GLFW.setErrorCallback $ Just $ const (hPutStrLn stderr)
   
   successfulInit <- GLFW.init
 
@@ -46,13 +42,9 @@ initialize title = do
 
 getInput :: GLFW.Window -> IO [GLFW.Key]
 getInput window = filterM (isPressed window) keys
-
-
-isPressed :: GLFW.Window -> GLFW.Key -> IO Bool
-isPressed window key = liftM2 (==) (GLFW.getKey window key) (return GLFW.KeyState'Pressed)
-
-
-keys = [GLFW.Key'E, GLFW.Key'S, GLFW.Key'D, GLFW.Key'F, GLFW.Key'Space, GLFW.Key'Escape, GLFW.Key'Enter]
+    where isPressed window key = liftM2 (==) (GLFW.getKey window key) (return GLFW.KeyState'Pressed)
+          keys = [GLFW.Key'E, GLFW.Key'S, GLFW.Key'D, GLFW.Key'F,
+                  GLFW.Key'Space, GLFW.Key'Escape, GLFW.Key'Enter]
 
 
 mainLoop :: GLFW.Window -> ProgramState -> Time -> IO ()
@@ -68,9 +60,9 @@ mainLoop w gls@(ProgramState gameState menuState introState mode input) prevTime
         input <- getInput w
 
         case mode of
-            Playing -> Draw.draw gameState
-            Menu -> Menu.draw w menuState
-            Intro -> Intro.draw w introState
+            Playing -> Game.Draw.draw gameState
+            Menu -> Menu.Draw.draw w menuState
+            Intro -> Intro.Draw.draw w introState
             _ -> return ()
 
         newTime <- GLFW.getTime
@@ -79,27 +71,26 @@ mainLoop w gls@(ProgramState gameState menuState introState mode input) prevTime
             Just time -> let 
 
                 newState = case mode of
-                    Playing -> (execState (Update.runFrame input) newTimeState) { gls_keysPressed = input }
-                    Menu -> (execState (Menu.runFrame input) newTimeState) { gls_keysPressed = input }
-                    Intro -> (execState (Intro.runFrame input) newTimeState) { gls_keysPressed = input }
-                    Restarting -> (execState (Update.runFrame input) newTimeState) { gls_gameState = is }
+                    Playing -> (execState (Game.Update.runFrame input) newTimeState) { gls_keysPressed = input }
+                    Menu -> (execState (Menu.Update.runFrame input) newTimeState) { gls_keysPressed = input }
+                    Intro -> (execState (Intro.Update.runFrame input) newTimeState) { gls_keysPressed = input }
+                    Restarting -> (execState (Game.Update.runFrame input) newTimeState) { gls_gameState = is }
 
                 newTimeState = case mode of
-                    Playing -> gls {
-                        gls_gameState = gameState {
-                                gs_time = ((gs_time . gls_gameState) gls) + (realToFrac time) - prevTime,
-                                gs_prevTime = (gs_time . gls_gameState) gls
-                            }
+                    Playing -> gls { gls_gameState = gameState {
+                            gs_time = ((gs_time . gls_gameState) gls) + deltaTime,
+                            gs_prevTime = (gs_time . gls_gameState) gls
                         }
-                    Intro -> gls {
-                        gls_introState = introState {
-                                is_time = ((is_time . gls_introState) gls) + (realToFrac time) - prevTime,
-                                is_prevTime = (is_time . gls_introState) gls
-                            }
+                    }
+                    Intro -> gls { gls_introState = introState {
+                            is_time = ((is_time . gls_introState) gls) + deltaTime,
+                            is_prevTime = (is_time . gls_introState) gls
                         }
+                    }
                     _ -> gls
 
                 in mainLoop w newState (realToFrac time)
+                where deltaTime = (realToFrac time) - prevTime
 
 
 main :: IO ()
@@ -112,7 +103,7 @@ main = do
     (rng, rng2) <- liftM2 (,) newStdGen newStdGen
 
     let menuState = MenuState Continue
-    
+     
     let gameState = initState 1 0.0 rng
     let introState = IntroState 0.0 0.0 [] (-10.0) rng2
     let keysPressed = []
@@ -120,7 +111,8 @@ main = do
     case time of
         Just t -> do
             let rt = realToFrac t
-            mainLoop window (ProgramState gameState { gs_time = rt, gs_prevTime = rt } menuState introState mode keysPressed) rt
+            let gameStateTimed = gameState { gs_time = rt, gs_prevTime = rt }
+            mainLoop window (ProgramState gameStateTimed menuState introState mode keysPressed) rt
         Nothing ->
             return ()
 

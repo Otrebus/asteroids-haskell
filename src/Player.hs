@@ -15,7 +15,7 @@ module Player (
     Thruster(..),
 
  ) where
-import Math
+import Utils.Math
 
 
 data Thrusters = Thrusters {
@@ -38,7 +38,7 @@ data Thruster = Thruster {
 plBl = Vector2d (-0.04) (-0.04) -- Bottom left corner
 plT = Vector2d 0 0.04           -- Top corner
 plBr = Vector2d 0.04 (-0.04)    -- Bottom right corner
-plB = Vector2d 0.00 (-0.02)    -- Bottom
+plB = Vector2d 0.00 (-0.02)     -- Bottom
 playerModel = ([plBl, plB, plBr, plT], [[plBl, plB, plT], [plT, plB, plBr]])
 
 

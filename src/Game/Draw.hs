@@ -1,16 +1,14 @@
-module Draw where
+module Game.Draw where
 
 import qualified Graphics.Rendering.OpenGL as GL hiding (get, rotate)
-import Graphics.Rendering.OpenGL (vertex, clear, ClearBuffer(ColorBuffer), renderPrimitive, PrimitiveMode(Lines, Points, QuadStrip, TriangleStrip, LineLoop, TriangleFan))
-import Font
-import Math
+import Graphics.Rendering.OpenGL (vertex, clear, ClearBuffer(ColorBuffer), renderPrimitive, PrimitiveMode(Points, TriangleStrip, LineLoop, TriangleFan))
+import Utils.Font
+import Utils.Math
 import State
-import Control.Monad.State (State, put, execState, get)
+import Control.Monad.State ()
 import Control.Monad
 import Player
-import Update
-import qualified Graphics.UI.GLFW as GLFW
-import Constants
+import Utils.Rendering
 
 
 drawParticles :: [Particle] -> IO ()
@@ -18,7 +16,7 @@ drawParticles particles = do
     renderPrimitive Points $ forM_ particles renderParticle where
         renderParticle p = do
             let d = p_brightness p
-            GL.color $ GL.Color4 d d d (d :: GL.GLfloat)
+            GL.color $ gray d
             vertex ((toVertex . p_position) p)
 
 
@@ -159,4 +157,4 @@ draw gs@(GameState playerState particles polygonParticles bullets asteroids time
     forM_ polygonParticles $ \(PolygonParticle vert vel angVel life) -> do
         let t = abs (life - time)
         let c = min 1.0 t ** 1.2
-        drawPolygon darkGray (GL.Color4 c c c c) vert
+        drawPolygon darkGray (gray c) vert

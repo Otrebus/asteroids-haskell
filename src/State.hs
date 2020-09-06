@@ -15,6 +15,7 @@ module State (
     IntroState(..),
     MenuChoice(..),
     Star(..),
+    Lifter,
     onThrusters,
     onPlayerState,
     onPlayerPos,
@@ -36,10 +37,10 @@ module State (
     rndFloat,
     rndInt,
     initState) where
-import Math
+import Utils.Math
 import Player
 import System.Random
-import Control.Monad.State (State, put, execState, get)
+import Control.Monad.State (State, put, get)
 import qualified Graphics.UI.GLFW as GLFW (Key)
 import Control.Monad.Random
 
@@ -217,9 +218,10 @@ initAsteroids n = do
     let poses = [Vector2d (cos a) (sin a) | i <- [1..n], let a = t0 + rtf i*2.0*pi/rtf n]
 
     forM poses $ \pos -> do
-        dist <- getRandomR (max 0.4 (size*1.2), 0.8)
+        let diag = size*1.44
+        dist <- getRandomR (diag*1.2, max (diag*1.2) (1.0-diag*1.2))
         poly <- (randomPolygon 13 (dist!*^pos) size size)
-        velRot <- getRandomR (-0.4, 0.4)
+        velRot <- getRandomR (-0.2, 0.2)
         dir <- fromList [(1, 0.5), (-1, 0.5)]
         let vel = dir !*^ rotate velRot (0.15!*^((normalize . ortho) pos))
         return (Asteroid 0.25 vel poly)
@@ -229,5 +231,5 @@ initAsteroids n = do
 
 initState :: Int -> Float -> StdGen -> GameState
 initState level score rng =
-    let (asteroids, rnd) = runRand (initAsteroids 2) rng
-    in GameState (PlayerState startPos startDir startVel 0 thrusters score Alive) [] [] [] asteroids 0.0 0.0 0 3 2 rng
+    let (asteroids, rnd) = runRand (initAsteroids level) rng
+    in GameState (PlayerState startPos startDir startVel 0 thrusters score Alive) [] [] [] asteroids 0.0 0.0 0 3 level rng
