@@ -28,7 +28,7 @@ infixl 5 #*^
 
 infixl 5 #*#
 (#*#) :: Matrix2d -> Matrix2d -> Matrix2d
-(#*#) (Matrix2d a b c d) (Matrix2d e f g h) = Matrix2d (a*e + b*g) (f*a + h*b) (c*e + d*g) (c*f + d*h)
+(#*#) (Matrix2d a b c d) (Matrix2d e f g h) = Matrix2d(a*e+ b*g) (f*a + h*b) (c*e + d*g) (c*f + d*h)
 
 infixl 6 !*^
 (!*^) :: Float -> Vector2d -> Vector2d
@@ -62,6 +62,8 @@ fromPair :: (Float, Float) -> Vector2d
 fromPair = uncurry Vector2d
 
 type Vertices = [Vector2d]
+
+type Edge = (Vector2d, Vector2d)
 
 type Position = Vector2d
 
@@ -99,10 +101,10 @@ randomPolygon n pos width height = do
 
     let (minX, minY, maxX, maxY) = bbox t
 
-    let transV = map (^-^ (Vector2d minX minY)) t
-    let scaledV = map (\(Vector2d x y) -> Vector2d (width*x/(maxX-minX)) (height*y/(maxY-minY))) transV
+    let tranV = map (^-^ (Vector2d minX minY)) t
+    let scalV = map (\(Vector2d x y) -> Vector2d (width*x/(maxX-minX)) (height*y/(maxY-minY))) tranV
 
-    return $ map (^+^ pos) (scaledV)
+    return $ map (^+^ pos) (scalV)
 
     where 
         vectorize n = do
@@ -135,7 +137,7 @@ angle (Vector2d x y) = atan2 y x
 
 
 rotateAround :: Float -> Vector2d -> Vector2d -> Vector2d
-rotateAround theta o v = (Matrix2d(cos theta) (-sin(theta)) (sin theta) (cos theta))#*^(v ^-^ o) ^+^ o
+rotateAround theta o v = getTurnMatrix theta#*^(v ^-^ o) ^+^ o
 
 
 moveVertices vel delta = map (\v -> v ^+^ (delta)!*^vel)
@@ -150,20 +152,23 @@ wrapVertices vs = map (^+^ (wrap (polyCentroid vs))) cfVs
     where cfVs = map (^-^ polyCentroid vs) vs
 
 
+polyEdges = zip <*> tail . cycle
+
+
 polyCentroid :: Vertices -> Vector2d
 polyCentroid vs = (Vector2d xs ys)^/!(6*area)
     where
         area = polyArea vs
-        xs = sum [ (xi+xi1)*(xi*yi1 - xi1*yi) | ((Vector2d xi yi), (Vector2d xi1 yi1)) <- zip vs ((tail . cycle) vs)]
-        ys = sum [ (yi+yi1)*(xi*yi1 - xi1*yi) | ((Vector2d xi yi), (Vector2d xi1 yi1)) <- zip vs ((tail . cycle) vs)]
+        xs = sum [ (xi+xi1)*(xi*yi1 - xi1*yi) | (Vector2d xi yi, Vector2d xi1 yi1) <- polyEdges vs]
+        ys = sum [ (yi+yi1)*(xi*yi1 - xi1*yi) | (Vector2d xi yi, Vector2d xi1 yi1) <- polyEdges vs]
 
 
 polyArea :: Vertices -> Float
-polyArea vs = 0.5*(sum [(xComp v)*(yComp w) - (yComp v)*(xComp w) | (v, w) <- zip vs ((tail . cycle) vs)])
+polyArea vs = 0.5*(sum [(xComp v)*(yComp w) - (yComp v)*(xComp w) | (v, w) <- polyEdges vs])
 
 
 polyCirc :: Vertices -> Float
-polyCirc vs = sum [len (v ^-^ w) | (v, w) <- zip vs ((tail . cycle) vs)]
+polyCirc vs = sum [len (v ^-^ w) | (v, w) <- polyEdges vs]
 
 
 calcRatio :: Vertices -> Float
@@ -187,4 +192,4 @@ intersects a b = let (s, t) = intersect a b in t >= 0 && t <= 1 && s >= 0.0 && s
 
 
 inside :: Vertices -> Vertices -> Bool
-inside as bs = or [and [(c ^-^ b) ^%^ (a ^-^ b) > 0 | (b, c) <- zip bs ((tail . cycle) bs)] | a <- as]
+inside as bs = or [and [(c ^-^ b) ^%^ (a ^-^ b) > 0 | (b, c) <- polyEdges bs] | a <- as]

@@ -47,7 +47,8 @@ topLeftThruster = Thruster 0.0 0.01 (interpolate plT plBl 0.2) (Vector2d (-1) 0)
 topRightThruster = Thruster 0.0 0.01 (interpolate plT plBr 0.2) (Vector2d (1) 0)
 bottomLeftThruster = Thruster 0.0 0.01 (interpolate plT plBl 0.8) (Vector2d (-1) 0)
 bottomRightThruster = Thruster 0.0 0.01 (interpolate plT plBr 0.8) (Vector2d (1) 0)
-thrusters = Thrusters mainThruster topLeftThruster topRightThruster bottomLeftThruster bottomRightThruster
+thrusters = (Thrusters mainThruster topLeftThruster topRightThruster
+                       bottomLeftThruster bottomRightThruster)
 
 
 blL = Vector2d (-0.002) (0.00)

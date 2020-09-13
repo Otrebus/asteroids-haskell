@@ -1,39 +1,35 @@
 module Game.Effects where
-
 import Utils.Math
 import State
-import Control.Monad.State (State, put, execState, get, when, filterM, liftM, forM_, replicateM)
+import Control.Monad.State (State, put, get, when, liftM, forM_, replicateM)
 import Player
-import Data.Ord (comparing)
-import Data.Foldable (maximumBy)
-import qualified Graphics.UI.GLFW as GLFW
-import Data.Maybe
-import Data.List hiding (intersect)
 
 
 randomPolyDivision :: [Vector2d] -> Int -> State GameState [[Vector2d]]
 randomPolyDivision vs 0 = return [vs]
 randomPolyDivision v r = do
-    let n = length v
-    let vs = cycle v
+    
+    let n = polyCirc v
+    i <- rndFloat 0.0 n
 
-    i <- rndInt 0 (n `div` 2 - 1)
-    let j = (i + (n `div` 2)) `mod` n
+    let (p1, t, vs, ws) = loopuntil i (cycle v)
+    let (p2, s, vs2, ws2) = loopuntil (n/2) ws
+    let zs = takeWhile (/= (head vs2)) ws2
 
-    if i == j then randomPolyDivision v r
-    else do
-        a <- rndFloat 0.4 0.6
-        b <- rndFloat 0.4 0.6
+    let vs1 = p2 : p1 : vs2
+    let vs2 = p1 : p2 : zs
 
-        let p1 = (interpolate (vs !! i) (vs !! (i+1)) a)
-        let p2 = (interpolate (vs !! j) (vs !! (j+1)) b)
-        let vs1 = p2 : p1 : (take (j-i) (drop (i+1) vs))
-        let vs2 = p1 : p2 : (take ((n-(j-i))) (drop (j+1) vs))
+    v1s <- randomPolyDivision vs1 (r-1)
+    v2s <- randomPolyDivision vs2 (r-1)
 
-        v1s <- randomPolyDivision vs1 (r-1)
-        v2s <- randomPolyDivision vs2 (r-1)
+    return (v1s ++ v2s)
 
-        return (v1s ++ v2s)
+    where loopuntil n (v1:v2:vs)
+            | l > n = (interpolate v1 v2 0.5, 0.5, [v1], (v2:yz))
+            | otherwise = (p, t, (v1:xs), yz)
+            where
+                (p, t, xs, yz) = loopuntil (n - l) (v2:vs)
+                l = len (v2 ^-^ v1)
 
 
 updateParticles :: Time -> Time -> [Particle] -> [Particle]
@@ -111,18 +107,18 @@ addEngineParticles thrusterGetter fp start current = do
     let (PlayerState pos dir vel angVel _ _ _) = gs_playerState state
     let thruster = thrusterGetter state
 
-    let nextParticleTime = current + (t_emissionInterval thruster)
-    when (nextParticleTime < time) $ do
+    let nextT = current + (t_emissionInterval thruster)
+    when (nextT < time) $ do
 
-        let deltaAngle = angVel * (nextParticleTime - time)
+        let deltaAngle = angVel * (nextT - time)
         let turnMatrix = getTurnMatrix deltaAngle
 
         let newDir = turnMatrix #*^ dir
 
-        addEngineParticle nextParticleTime thruster 0.6 (pos ^+^ (vel ^*! (nextParticleTime-start))) newDir vel
+        addEngineParticle nextT thruster 0.6 (pos ^+^ (vel ^*! (nextT-start))) newDir vel
         state <- get
-        put $ ((onPlayerState . onThrusters . fp) (\t -> t { t_lastEmitted = nextParticleTime } )) state
-        addEngineParticles thrusterGetter fp start nextParticleTime
+        put $ ((onPlayerState . onThrusters . fp) (\t -> t { t_lastEmitted = nextT } )) state
+        addEngineParticles thrusterGetter fp start nextT
 
 
 addEnginesParticles :: [Action] -> State GameState ()
@@ -147,14 +143,13 @@ addEnginesParticles actions = do
 explodePolygon :: Vertices -> Vector2d -> Vector2d -> Float -> State GameState ()
 explodePolygon p pos vel time = do
     state <- get
-    newPs <- randomPolyDivision p 3
+    newPs <- randomPolyDivision p 4
     ppps <- mapM (\p -> (launchPolygon p pos time vel)) newPs
     put $ (onPolygonParticles (\pps -> ppps ++ pps)) state
 
     where 
         launchPolygon poly pos time vel = do
             v <- liftM (**1.2) (rndFloat 5.0 15.0)
-            ang <- liftM (**1.1) (rndFloat 0 2.3)
             x <- rndFloat (-1) 1
             angVel <- liftM (**2.1) (rndFloat 0 3.0)
             dirAng <- rndFloat (-1) 1

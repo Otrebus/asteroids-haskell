@@ -14,6 +14,7 @@ runFrame input = do
     let newDown = filter (\k -> not (k `elem` prevPressed)) input
 
     case ((ms_menuChoice . gls_menuState) state) of
+        -- Hard-coded, if this were to grow larger I'd operate this on some sort of tree
         Continue -> do
             when (GLFW.Key'D `elem` newDown) $ do
                 put $ state { gls_menuState = (gls_menuState state) { ms_menuChoice = Quit } }

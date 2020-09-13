@@ -71,11 +71,12 @@ mainLoop w gls@(ProgramState gameState menuState introState mode input) prevTime
             Just time -> let 
 
                 newState = case mode of
-                    Playing -> (execState (Game.Update.runFrame input) newTimeState) { gls_keysPressed = input }
-                    Menu -> (execState (Menu.Update.runFrame input) newTimeState) { gls_keysPressed = input }
-                    Intro -> (execState (Intro.Update.runFrame input) newTimeState) { gls_keysPressed = input }
-                    Restarting -> (execState (Game.Update.runFrame input) newTimeState) { gls_gameState = is }
+                    Playing -> (execState (Game.Update.runFrame inp) nts) { gls_keysPressed = inp }
+                    Menu -> (execState (Menu.Update.runFrame inp) nts) { gls_keysPressed = inp }
+                    Intro -> (execState (Intro.Update.runFrame inp) nts) { gls_keysPressed = inp }
+                    Restarting -> (execState (Game.Update.runFrame inp) nts) { gls_gameState = is }
 
+                (nts, inp) = (newTimeState, input)
                 newTimeState = case mode of
                     Playing -> gls { gls_gameState = gameState {
                             gs_time = ((gs_time . gls_gameState) gls) + deltaTime,

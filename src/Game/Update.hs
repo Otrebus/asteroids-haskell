@@ -1,23 +1,19 @@
 module Game.Update where
-
 import Utils.Math
 import State
-import Control.Monad.State (State, put, execState, get, when, filterM, liftM, forM_, replicateM)
+import Control.Monad.State (State, put, execState, get, when)
 import Player
-import Data.Ord (comparing)
-import Data.Foldable (maximumBy)
 import qualified Graphics.UI.GLFW as GLFW
 import Data.Maybe
 import Data.List hiding (intersect)
 import Game.Effects
 import Game.Asteroids
-import Debug.Trace
 
 
 bulletVel = 0.90 :: Float
 fireRate = 0.23 :: Float -- time between bullets
-accRate = 0.2 :: Float -- screens per second per second
-angularAcc = 2.0 :: Float
+accRate = 0.3 :: Float -- screens per second per second
+angularAcc = 3.0 :: Float
 
 
 normalizePositions :: State GameState ()
@@ -39,6 +35,7 @@ addBullets = do
     state <- get
 
     let playerState@(PlayerState pos dir vel _ _ lastBullet _) = gs_playerState state
+
     let time = gs_time state
 
     when (lastBullet + fireRate < time) $ do
@@ -56,7 +53,7 @@ addBullets = do
         }
 
 
-bulletImpact :: Asteroid -> Bullet -> Float -> Maybe ((Vector2d, Vector2d), Float)
+bulletImpact :: Asteroid -> Bullet -> Float -> Maybe (Edge, Float)
 bulletImpact asteroid bullet delta = if impacts /= [] then Just (v, t) else Nothing
     where 
           (a, b, v, s, t) = mini
@@ -68,18 +65,18 @@ bulletImpact asteroid bullet delta = if impacts /= [] then Just (v, t) else Noth
               bp <- map (bulPos ^+^) [Vector2d 0.0 0.0, Vector2d 2.0 0.0, Vector2d (-2.0) 0.0,
                                       Vector2d 0.0 2.0, Vector2d 0.0 (-2.0)],
               let angVel = a_angularVelocity asteroid,
-              let (b1, b2) = (bp, bp ^+^ ((bulVel ^-^ astVel) ^-^ rotV centroid v (angVel)) ^*! delta),
+              let (b1, b2) = (bp, bp ^+^ ((bulVel ^-^ astVel) ^-^ rotV centroid v (-angVel)) ^*! delta),
               let (s, t) = intersect (b1, b2) v]
 
           bulVel = b_velocity bullet
           bulPos = b_position bullet
           astVel = a_velocity asteroid
 
-          rotV c (v1, v2) av = let Vector2d x y = ((interpolate v1 v2 0.5) ^-^ c) ^*! av in Vector2d (-y) x
+          rotV c (v1, v2) av = ortho $ ((interpolate v1 v2 0.5) ^-^ c) ^*! av
 
           nvs = length vertices
           centroid = polyCentroid (vertices)
-          vs = zip vertices ((tail . cycle) vertices)
+          vs = polyEdges vertices
           vertices = a_vertices asteroid
 
 
@@ -96,15 +93,15 @@ detectCollisions = do
     let p1s = map ((^+^ pos) . (rebase dir)) verts
     let tri1s = [map ((^+^ pos) . (rebase dir)) tri | tri <- tris]
 
-    let a = or (map (\(Asteroid _ _ vs) -> detectCollision p1s vs (vel^*!(time - prevTime))) asteroids)
-    let b = or (map (\(Asteroid _ _ vs) -> detectCollision vs p1s (vel^*!(prevTime - time))) asteroids)
+    let a = or (map (\(Asteroid _ _ vs) -> detectColl p1s vs (vel^*!(time - prevTime))) asteroids)
+    let b = or (map (\(Asteroid _ _ vs) -> detectColl vs p1s (vel^*!(prevTime - time))) asteroids)
     let c = or (map (\(Asteroid _ _ vs) -> inside p1s vs) asteroids)
     let d = or [or (map (\(Asteroid _ _ vs) -> inside vs t) asteroids) | t <- tri1s]
 
     return (a || b || c || d)
 
-    where detectCollision ps vs dir = or [intersects (p, p ^+^ dir) (v1, v2) |
-                                          p <- ps, (v1, v2) <- zip vs ((tail . cycle) vs)]
+    where detectColl ps vs dir = or [intersects (p, p ^+^ dir) (v1, v2) |
+                                     p <- ps, (v1, v2) <- polyEdges vs]
 
 
 runFrame :: [GLFW.Key] -> State ProgramState ()
@@ -145,7 +142,9 @@ updatePlayer delta actions = do
 
     state <- get
 
-    let GameState (playerState@(PlayerState pos dir vel angVel thrusters lastBullet aliveState)) particles polygonParticles bullets asteroids time prevTime score lives level rng = state
+    let playerState = gs_playerState state
+    let time = gs_time state
+    let PlayerState pos dir vel angVel thrusters _ aliveState = playerState
 
     let turnAcc = ((if TurningRight `elem` actions then (-angularAcc) else 0.0) +
                    (if TurningLeft `elem` actions then angularAcc else 0.0))
@@ -154,7 +153,8 @@ updatePlayer delta actions = do
 
     let turnMatrix = getTurnMatrix deltaAngle
     let newVel = if Accelerating `elem` actions then (vel ^+^ (delta * accRate)!*^dir ) else vel
-    let newPos = pos ^+^ (delta!*^vel) ^+^ (0.5*delta*delta*(if Accelerating `elem` actions then accRate else 0))!*^dir
+    let accRate' = (if Accelerating `elem` actions then accRate else 0)
+    let newPos = pos ^+^ (delta!*^vel) ^+^ (0.5*delta*delta*accRate')!*^dir
 
     put $ state {
         gs_playerState = (gs_playerState state) {
@@ -194,7 +194,33 @@ finalizeRespawn = do
 advanceLevel :: State GameState ()
 advanceLevel = do
     state <- get
-    put $ (initState (1 + (gs_level state)) 0.0 (gs_rng state)) { gs_score = gs_score state }
+    put $ (initState (1 + (gs_level state)) 0.0 (gs_rng state)) {
+        gs_score = gs_score state,
+        gs_lives = gs_lives state
+    }
+
+
+handleBullets = do
+
+    state <- get
+
+    let GameState playerState _ _ bullets asteroids time prevTime _ lives _ _ = state
+    let delta = time - prevTime
+    let impacts = [(bul, ast, m) | ast <- asteroids, bul <- bullets,
+                   let m = bulletImpact ast bul delta, isJust m]
+    let impactedAsteroids = map (\(_, ast, _) -> ast) impacts
+
+    let newPairs = map ((\(bul, ast, Just ((v1, v2), t)) -> splitAsteroid ast (v1, v2) t)) impacts
+    let newAsteroids = concat $ map (\(a, b) -> [a, b]) newPairs
+
+    explodeNewAsteroids time newAsteroids
+
+    when ((not . null) impacts) $ do
+        state <- get
+        put $ state {
+            gs_asteroids = ((gs_asteroids state) \\ impactedAsteroids) ++ newAsteroids,
+            gs_bullets = filter (\b -> (and [(b /= bl) | (bl, _, _) <- impacts])) (gs_bullets state)
+        }
 
 
 runGameFrame :: [Action] -> State GameState ()
@@ -222,21 +248,7 @@ runGameFrame actions = do
             updatePlayer delta actions
         _ -> return ()
 
-    let impacts = [(bul, ast, m) | ast <- asteroids, bul <- bullets,
-                   let m = bulletImpact ast bul delta, isJust m]
-    let impactedAsteroids = map (\(_, ast, _) -> ast) impacts
-
-    let newAsteroidPairs = map ((\(bul, ast, Just ((v1, v2), t)) -> splitAsteroid ast (v1, v2) t)) impacts
-    let newAsteroids = concat $ map (\(a, b) -> [a, b]) newAsteroidPairs
-
-    explodeNewAsteroids time newAsteroids
-
-    when ((not . null) impacts) $ do
-        state <- get
-        put $ state {
-            gs_asteroids = ((gs_asteroids state) \\ impactedAsteroids) ++ newAsteroids,
-            gs_bullets = filter (\b -> (and [(b /= bl) | (bl, _, _) <- impacts])) (gs_bullets state)
-        }
+    handleBullets
 
     state <- get
 

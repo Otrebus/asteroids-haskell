@@ -1,25 +1,20 @@
 module Game.Asteroids where
-
 import Utils.Math
 import State
-import Control.Monad.State (State, put, execState, get, when, filterM, liftM, forM_, replicateM)
-import Player
+import Control.Monad.State (State, put, get, when, filterM, liftM)
 import Data.Ord (comparing)
-import Data.Foldable (maximumBy)
-import qualified Graphics.UI.GLFW as GLFW
-import Data.Maybe
 import Data.List hiding (intersect)
 import Game.Effects
 
 
-rotateVertices asteroid delta = map (\v -> ( (getTurnMatrix (delta*angVel))#*^(v ^-^ cent) ^+^ cent)) vs
+rotateVertices asteroid delta = map (\v -> ( (getTurnMatrix (delta*angVel))#*^(v ^-^ c) ^+^ c)) vs
     where
-        cent = polyCentroid vs
+        c = polyCentroid vs
         angVel = a_angularVelocity asteroid
         vs = a_vertices asteroid
 
 
-loopSplits :: (Vector2d, Vector2d) -> Float -> Vertices -> (Vector2d, Vector2d) -> Vertices -> (Vertices, Vertices)
+loopSplits :: Edge -> Float -> Vertices -> Edge -> Vertices -> (Vertices, Vertices)
 loopSplits (p1, p2) t (xs) (v1, v2) [] = ([], [])
 loopSplits (p1, p2) t (xs) (v1, v2) (y:ys)
     | otherwise = maximumBy (comparing (\(a, b) -> (calcRatio a)*(calcRatio b))) (ds:cs)
@@ -32,7 +27,7 @@ loopSplits (p1, p2) t (xs) (v1, v2) (y:ys)
         maximumOn f = foldr1 (\a xs -> if f a > f xs then a else xs)
 
 
-splitAsteroid :: Asteroid -> (Vector2d, Vector2d) -> Float -> (Asteroid, Asteroid)
+splitAsteroid :: Asteroid -> Edge -> Float -> (Asteroid, Asteroid)
 splitAsteroid asteroid (p1, p2) t =
     (Asteroid (angVel) ((a_velocity asteroid) ^+^ Vector2d (-day) dax ^+^ (normalize a)^*!0.05) as,
      Asteroid (angVel) ((a_velocity asteroid) ^+^ Vector2d (-dby) dbx ^+^ (normalize b)^*!0.05) bs)

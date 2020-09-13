@@ -21,6 +21,7 @@ draw :: GLFW.Window -> MenuState -> IO ()
 draw window menuState = do
     clear [ColorBuffer]
 
+    -- Hard-coded, if this were to grow into an actual menu I'd do this differently
     centerText 0.1 (Vector2d (-0.3) (0.3)) (Vector2d 0.3 0.2) "Game Paused"
     drawText 0.08 (Vector2d (-0.23) (0.04)) "Continue"
     drawText 0.08 (Vector2d (-0.23) (-0.06)) "Quit"

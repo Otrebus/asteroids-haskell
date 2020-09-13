@@ -45,9 +45,15 @@ import qualified Graphics.UI.GLFW as GLFW (Key)
 import Control.Monad.Random
 
 
-data Action = Shooting | Accelerating | Decelerating | TurningLeft | TurningRight | Escaping | Entering deriving (Show, Eq)
-data AliveState = Alive | Exploding Float | Respawning Float | GameOver Float | Winning Float deriving (Show, Eq)
-data ProgramMode = Intro | Playing | Menu | Exiting | Restarting | Progressing deriving (Show, Eq)
+data Action = Shooting | Accelerating | Decelerating | TurningLeft |
+              TurningRight | Escaping | Entering deriving (Show, Eq)
+
+data AliveState = Alive | Exploding Float | Respawning Float |
+                  GameOver Float | Winning Float deriving (Show, Eq)
+
+data ProgramMode = Intro | Playing | Menu | Exiting |
+                   Restarting | Progressing deriving (Show, Eq)
+
 data MenuChoice = Continue | Quit | Yes | No deriving (Show, Eq)
 
 data Object = Object (Vertices, [Vertices]) Direction Position
@@ -224,7 +230,7 @@ initAsteroids n = do
         velRot <- getRandomR (-0.2, 0.2)
         dir <- fromList [(1, 0.5), (-1, 0.5)]
         let vel = dir !*^ rotate velRot (0.15!*^((normalize . ortho) pos))
-        return (Asteroid 0.25 vel poly)
+        return (Asteroid (0.25*rtf n) vel poly)
 
     where rtf = realToFrac
 
@@ -232,4 +238,5 @@ initAsteroids n = do
 initState :: Int -> Float -> StdGen -> GameState
 initState level score rng =
     let (asteroids, rnd) = runRand (initAsteroids level) rng
-    in GameState (PlayerState startPos startDir startVel 0 thrusters score Alive) [] [] [] asteroids 0.0 0.0 0 3 level rng
+        initPlayerState = PlayerState startPos startDir startVel 0 thrusters score Alive
+    in GameState initPlayerState [] [] [] asteroids 0.0 0.0 0 3 level rng
