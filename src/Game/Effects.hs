@@ -37,9 +37,8 @@ updateParticles time deltaT particles = newParticles
     where
         filteredParticles = filter ((>time) . p_lifeTime) $ filter ((>0.01) . (p_brightness)) particles
         newParticles = map (\(Particle pos vel start life bri) -> (
-            let newBri = (bri*(life-time)/(life-start))**0.85
-                newPos = pos ^+^ (min (time-start) deltaT)!*^vel
-            in  Particle newPos vel start life newBri)) filteredParticles
+            let newPos = pos ^+^ (min (time-start) deltaT)!*^vel
+            in  Particle newPos vel start life bri)) filteredParticles
 
 
 updatePolygonParticles :: Time -> Time -> [PolygonParticle] -> [PolygonParticle]
@@ -54,9 +53,11 @@ updatePolygonParticles time deltaT particles = newParticles
 addExplosionParticle :: Time -> Vector2d -> Vector2d -> Vector2d -> Float -> Float -> State GameState (Particle)
 addExplosionParticle time pos dir vel pw life = do
 
-    v <- liftM (**1.1) (rndFloat 0 pw)
+    t <- rndFloat 0 1
+    v <- liftM (**t) (rndFloat 0 pw)
     ang <- liftM (**1.1) (rndFloat 0 2.3)
     x <- rndFloat (-1) 1
+    lt <- rndFloat 0.5 1
     ang2 <- rndFloat 0 (2*pi)
 
     let anyDir = (rotate ang2 (Vector2d 1.0 0.0))
@@ -64,7 +65,7 @@ addExplosionParticle time pos dir vel pw life = do
     let pvel = if (dir /= (Vector2d 0.0 0.0)) then narrowDir^*!v*v else anyDir^*!v
     let ppos = pos
 
-    return (Particle ppos (pvel ^+^ vel) time (time + life) 0.8)
+    return (Particle ppos (pvel ^+^ vel) time (time + life*lt) 0.8)
 
 
 addExplosion :: Time -> Vector2d -> Vector2d -> Vector2d -> Int -> Float -> Float -> State GameState ()
@@ -92,7 +93,7 @@ addEngineParticle time thruster speed playerPos playerDir playerVel = do
 
     let pos = (playerPos ^+^ newPos)
     let vel = (playerVel ^+^ ((newnDir)^*!(speed + s)))
-    let lifeTime = (time + 2.5 + 0.2)
+    let lifeTime = (time + 1.5)
     let brightness = (0.5 + q)
 
     put $ onParticles ((:) (Particle pos vel time lifeTime brightness)) state
@@ -156,7 +157,7 @@ explodePolygon p pos vel time = do
 
             let polyVel = ((polyCentroid poly) ^-^ pos)^*!v
 
-            return (PolygonParticle poly (vel ^+^ polyVel) (dirAng*angVel) (time + 1.5))
+            return (PolygonParticle poly (vel ^+^ polyVel) (dirAng*angVel) (time + 1.0))
 
 
 explodeShip :: State GameState ()
@@ -175,7 +176,7 @@ explodeShip = do
     let mat = Matrix2d b a (-a) b
     let tris = map (\v -> (map ((pos ^+^) . ((#*^) mat)) v)) triangles
 
-    addExplosion time pos (Vector2d 0.0 0.0) vel 1450 1.0 5.0
+    addExplosion time pos (Vector2d 0.0 0.0) vel 1450 2.0 2.0
 
     forM_ tris $ \p -> do
         explodePolygon p pos vel time

@@ -11,13 +11,13 @@ import Player
 import Utils.Rendering
 
 
-drawParticles :: [Particle] -> IO ()
-drawParticles particles = do
+drawParticles :: Time -> [Particle] -> IO ()
+drawParticles time particles = do
     renderPrimitive Points $ forM_ particles renderParticle where
-        renderParticle p = do
-            let d = p_brightness p
+        renderParticle (Particle pos _ start life bri) = do
+            let d = bri*((life-time)/(life-start))**3
             GL.color $ gray d
-            vertex ((toVertex . p_position) p)
+            vertex $ toVertex pos
 
 
 drawPolygon :: GL.Color4 Float -> GL.Color4 Float -> Vertices -> IO ()
@@ -144,17 +144,17 @@ draw gs@(GameState playerState particles polygonParticles bullets asteroids time
         _ -> do
             return ()
         
-    drawParticles particles
+    drawParticles time particles
 
     forM_ bullets $ \(Bullet pos dir vel _) -> do
         drawObject (Object bulletModel dir pos)
         drawDuplicateObjects (Object bulletModel dir pos)
 
-    forM_ asteroids $ \(Asteroid dir vel vert) -> do
-        drawPolygon darkGray white vert
-        drawduplicateAsteroids vert
-
     forM_ polygonParticles $ \(PolygonParticle vert vel angVel life) -> do
         let t = abs (life - time)
         let c = min 1.0 t ** 1.2
         drawPolygon darkGray (gray c) vert
+
+    forM_ asteroids $ \(Asteroid dir vel vert) -> do
+        drawPolygon darkGray white vert
+        drawduplicateAsteroids vert

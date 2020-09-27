@@ -11,8 +11,8 @@ import Game.Asteroids
 
 
 bulletVel = 0.90 :: Float
-fireRate = 0.23 :: Float -- time between bullets
-accRate = 0.3 :: Float -- screens per second per second
+fireInterval = 0.23 :: Float
+accRate = 0.3 :: Float
 angularAcc = 3.0 :: Float
 
 
@@ -38,7 +38,7 @@ addBullets = do
 
     let time = gs_time state
 
-    when (lastBullet + fireRate < time) $ do
+    when (lastBullet + fireInterval < time) $ do
         let bulletPos = pos ^+^ rebase dir plT
         put state {
             gs_playerState = playerState {
@@ -119,23 +119,22 @@ runFrame input = do
 
     state <- get
 
-    let newState = state {
-        gls_gameState = execState (runGameFrame actions) (gls_gameState state)
-    }
-
     let prevPressed = gls_keysPressed state
     let newDown = filter (\k -> not (k `elem` prevPressed)) input
 
-    put $ newState { gls_mode = if GLFW.Key'Escape `elem` newDown then Menu else Playing }
+    put $ state {
+        gls_mode = if GLFW.Key'Escape `elem` newDown then Menu else Playing,
+        gls_gameState = execState (runGameFrame actions) (gls_gameState state)
+    }
 
     state <- get
     
-    case (ps_aliveState . gs_playerState . gls_gameState) state of
-        GameOver _ -> do
-            when (GLFW.Key'Enter `elem` newDown) $ do
-                put $ state { gls_mode = Restarting }
-        _ -> return ()
-    
+    when ((GLFW.Key'Enter `elem` newDown) && (isGameOver . ps_aliveState . gs_playerState . gls_gameState $ state)) $ do
+        put $ state { gls_mode = Restarting }
+
+    where
+        isGameOver (GameOver _) = True
+        isGameOver _ = False
 
 updatePlayer :: Float -> [Action] -> State GameState ()
 updatePlayer delta actions = do
@@ -264,10 +263,9 @@ runGameFrame actions = do
 
     normalizePositions
 
-    when (null asteroids) $ do
-        case (ps_aliveState playerState) of
-            Alive -> do
-                state <- get
-                put $ onPlayerState (\s -> s { ps_aliveState = Winning time }) state
-            _ -> return ()
-        return ()
+    when (asteroids == [] && (isAlive . ps_aliveState) playerState) $ do
+        state <- get
+        put $ onPlayerState (\s -> s { ps_aliveState = Winning time }) state
+
+    where isAlive Alive = True
+          isAlive _ = False

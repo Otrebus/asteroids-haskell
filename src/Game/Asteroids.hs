@@ -24,7 +24,6 @@ loopSplits (p1, p2) t (xs) (v1, v2) (y:ys)
         splitAt s =
             ((interpolate p1 p2 t):xs ++ ([interpolate v1 v2 s]),
              (interpolate v1 v2 s):y:(ys ++ [interpolate p1 p2 t]))
-        maximumOn f = foldr1 (\a xs -> if f a > f xs then a else xs)
 
 
 splitAsteroid :: Asteroid -> Edge -> Float -> (Asteroid, Asteroid)
@@ -65,7 +64,7 @@ explodeAsteroid asteroid = do
     let pos = polyCentroid . a_vertices $ asteroid
     let vel = a_velocity asteroid
 
-    let nParticles = (round ((polyArea . a_vertices $ asteroid)*100000))
+    let nParticles = round ((polyArea . a_vertices $ asteroid)*100000)
     addExplosion time pos (Vector2d 0.0 0.0) vel nParticles 1.0 5.0
 
     explodePolygon (a_vertices asteroid) pos vel (gs_time state)

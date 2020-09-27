@@ -1,1 +1,0 @@
-stack build --file-watch --exec=asteroids-exe

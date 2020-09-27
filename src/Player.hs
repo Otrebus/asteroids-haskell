@@ -35,10 +35,10 @@ data Thruster = Thruster {
 } deriving (Show)
 
 
-plBl = Vector2d (-0.04) (-0.04) -- Bottom left corner
-plT = Vector2d 0 0.04           -- Top corner
-plBr = Vector2d 0.04 (-0.04)    -- Bottom right corner
-plB = Vector2d 0.00 (-0.02)     -- Bottom
+plBl = Vector2d (-0.04) (-0.04)
+plT = Vector2d 0 0.04
+plBr = Vector2d 0.04 (-0.04)
+plB = Vector2d 0.00 (-0.02)
 playerModel = ([plBl, plB, plBr, plT], [[plBl, plB, plT], [plT, plB, plBr]])
 
 
