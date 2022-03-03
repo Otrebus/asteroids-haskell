@@ -106,7 +106,6 @@ detectCollisions = do
 
 runFrame :: [GLFW.Key] -> State ProgramState ()
 runFrame input = do
-
     let keyCommands = [(GLFW.Key'E, Accelerating),
                        (GLFW.Key'S, TurningLeft),
                        (GLFW.Key'D, Decelerating),
@@ -138,7 +137,6 @@ runFrame input = do
 
 updatePlayer :: Float -> [Action] -> State GameState ()
 updatePlayer delta actions = do
-
     state <- get
 
     let playerState = gs_playerState state
@@ -199,8 +197,8 @@ advanceLevel = do
     }
 
 
+handleBullets :: State GameState()
 handleBullets = do
-
     state <- get
 
     let GameState playerState _ _ bullets asteroids time prevTime _ lives _ _ = state
@@ -224,7 +222,6 @@ handleBullets = do
 
 runGameFrame :: [Action] -> State GameState ()
 runGameFrame actions = do
-
     state <- get
 
     let GameState playerState _ _ bullets asteroids time prevTime _ lives _ _ = state
