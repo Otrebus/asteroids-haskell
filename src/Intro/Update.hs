@@ -6,9 +6,9 @@ import Utils.Math
 import System.Random
 import Control.Monad.State
 
+
 rndFloat :: Float -> Float -> State IntroState (Float)
 rndFloat min max = do
-
     state <- get
     let (value, newGenerator) = randomR (min, max) (is_rng state)
     put (state { is_rng = newGenerator } )
@@ -17,7 +17,6 @@ rndFloat min max = do
 
 spawnStars :: Float -> Float -> State IntroState ()
 spawnStars lastStar time = do
-
     state <- get
 
     r <- rndFloat 0.001 0.002
@@ -39,17 +38,15 @@ spawnStars lastStar time = do
         spawnStars nextStar time
 
 
-runFrame :: [GLFW.Key] -> State ProgramState ()
-runFrame input = do
-    
+runFrame :: State ProgramState ()
+runFrame = do
     state <- get
 
     put $ state {
         gls_introState = execState runIntroFrame (gls_introState state)
     }
 
-    let prevPressed = gls_keysPressed state
-    let newDown = filter (\k -> not (k `elem` prevPressed)) input
+    let newDown = gls_keysPressed state
 
     when (GLFW.Key'Enter `elem` newDown) $ do
         state <- get
@@ -60,7 +57,6 @@ runFrame input = do
 
 runIntroFrame :: State IntroState ()
 runIntroFrame = do
-
     state <- get
     spawnStars (is_lastStar state) (is_time state)
     state <- get

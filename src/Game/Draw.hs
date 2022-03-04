@@ -22,7 +22,6 @@ drawParticles time particles = do
 
 drawPolygon :: GL.Color4 Float -> GL.Color4 Float -> Vertices -> IO ()
 drawPolygon back fore verts = do
-
     GL.color $ back
     renderPrimitive TriangleFan $ do mapM_ vertex (map toVertex verts)
     GL.color $ fore
@@ -32,7 +31,6 @@ drawPolygon back fore verts = do
 
 drawObject :: Object -> IO ()
 drawObject (Object (lineVertices, triangles) (Vector2d a b) pos) = do
-
     let mat = Matrix2d b a (-a) b
     let tris = map (\v -> (map (toVertex . (pos ^+^) . ((#*^) mat)) v)) triangles
     let ys = map (toVertex . (pos ^+^) . ((#*^) mat)) lineVertices
@@ -47,7 +45,6 @@ drawObject (Object (lineVertices, triangles) (Vector2d a b) pos) = do
 
 drawDuplicateObjects :: Object -> IO ()
 drawDuplicateObjects (Object (vectors, tris) dir pos) = do
-
     let (Vector2d x y) = pos
     let (Vector2d a b) = dir
     let mat = Matrix2d b a (-a) b
@@ -66,7 +63,6 @@ drawDuplicateObjects (Object (vectors, tris) dir pos) = do
 
 drawduplicateAsteroids :: Vertices -> IO ()
 drawduplicateAsteroids vectors = do
-
     let (Vector2d x y) = polyCentroid vectors
 
     let a = 2*(-signum x) :: Float
@@ -102,7 +98,6 @@ drawLife aliveState time max life = drawPolygon black white pm
 
 drawLives :: GameState -> IO ()
 drawLives state = do
-
     let score = gs_score state
     let lives = gs_lives state
     let time = gs_time state
@@ -114,7 +109,6 @@ drawLives state = do
 
 draw :: GameState -> IO ()
 draw gs@(GameState playerState particles polygonParticles bullets asteroids time _ score lives _ _) = do
-
     clear [ColorBuffer]
 
     drawText 0.1 (Vector2d (-0.92) 0.88) ("Score: " ++ (show . round $ score))

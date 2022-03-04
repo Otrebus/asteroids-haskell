@@ -9,7 +9,7 @@ An Asteroids pseudo-clone made in Haskell.
 * Open up a command prompt and run `stack build --file-watch --exec=asteroids-exe` in the root directory of the repository.
 
 ### Linux
-From a clean Ubuntu install, run
+From a clean Ubuntu install:
 
 * To install curl, run `sudo apt install curl` if necessary.
 * Install the Haskell Stack with `curl -sSL https://get.haskellstack.org/ | sh`.

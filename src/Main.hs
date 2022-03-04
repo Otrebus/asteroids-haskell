@@ -48,7 +48,7 @@ getInput window = filterM (isPressed window) keys
 
 
 mainLoop :: GLFW.Window -> ProgramState -> Time -> IO ()
-mainLoop w gls@(ProgramState gameState menuState introState mode input) prevTime = do
+mainLoop w gls@(ProgramState gameState menuState introState mode input newPressed) prevTime = do
     close <- GLFW.windowShouldClose w
 
     let is = initState 1 0.0 ((gs_rng . gls_gameState) gls)
@@ -58,6 +58,9 @@ mainLoop w gls@(ProgramState gameState menuState introState mode input) prevTime
         GLFW.swapBuffers w
         GLFW.pollEvents
         input <- getInput w
+
+        let prevPressed = gls_keysHeld gls
+        let newDown = filter (\k -> not (k `elem` prevPressed)) input
 
         case mode of
             Playing -> Game.Draw.draw gameState
@@ -71,13 +74,12 @@ mainLoop w gls@(ProgramState gameState menuState introState mode input) prevTime
             Just time -> let 
 
                 newState = case mode of
-                    Playing -> (execState (Game.Update.runFrame inp) nts) { gls_keysPressed = inp }
-                    Menu -> (execState (Menu.Update.runFrame inp) nts) { gls_keysPressed = inp }
-                    Intro -> (execState (Intro.Update.runFrame inp) nts) { gls_keysPressed = inp }
-                    Restarting -> (execState (Game.Update.runFrame inp) nts) { gls_gameState = is }
+                    Playing -> (execState Game.Update.runFrame nts) { gls_keysHeld = input, gls_keysPressed = newDown }
+                    Menu -> (execState Menu.Update.runFrame nts) { gls_keysHeld = input, gls_keysPressed = newDown }
+                    Intro -> (execState Intro.Update.runFrame nts) { gls_keysHeld = input, gls_keysPressed = newDown }
+                    Restarting -> (execState Game.Update.runFrame nts) { gls_gameState = is }
 
-                (nts, inp) = (newTimeState, input)
-                newTimeState = case mode of
+                nts = case mode of
                     Playing -> gls { gls_gameState = gameState {
                             gs_time = ((gs_time . gls_gameState) gls) + deltaTime,
                             gs_prevTime = (gs_time . gls_gameState) gls
@@ -107,13 +109,12 @@ main = do
      
     let gameState = initState 1 0.0 rng
     let introState = IntroState 0.0 0.0 [] (-10.0) rng2
-    let keysPressed = []
     let mode = Intro
     case time of
         Just t -> do
             let rt = realToFrac t
             let gameStateTimed = gameState { gs_time = rt, gs_prevTime = rt }
-            mainLoop window (ProgramState gameStateTimed menuState introState mode keysPressed) rt
+            mainLoop window (ProgramState gameStateTimed menuState introState mode [] []) rt
         Nothing ->
             return ()
 

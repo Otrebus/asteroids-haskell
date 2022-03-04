@@ -104,8 +104,8 @@ detectCollisions = do
                                      p <- ps, (v1, v2) <- polyEdges vs]
 
 
-runFrame :: [GLFW.Key] -> State ProgramState ()
-runFrame input = do
+runFrame :: State ProgramState ()
+runFrame = do
     let keyCommands = [(GLFW.Key'E, Accelerating),
                        (GLFW.Key'S, TurningLeft),
                        (GLFW.Key'D, Decelerating),
@@ -114,12 +114,10 @@ runFrame input = do
                        (GLFW.Key'Escape, Escaping),
                        (GLFW.Key'Enter, Entering)]
 
-    let actions = map snd $ filter ((`elem` input) . fst) keyCommands
-
     state <- get
 
-    let prevPressed = gls_keysPressed state
-    let newDown = filter (\k -> not (k `elem` prevPressed)) input
+    let actions = map snd $ filter ((`elem` (gls_keysHeld state)) . fst) keyCommands
+    let newDown = gls_keysPressed state
 
     put $ state {
         gls_mode = if GLFW.Key'Escape `elem` newDown then Menu else Playing,

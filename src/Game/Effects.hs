@@ -8,7 +8,6 @@ import Player
 randomPolyDivision :: [Vector2d] -> Int -> State GameState [[Vector2d]]
 randomPolyDivision vs 0 = return [vs]
 randomPolyDivision v r = do
-    
     let n = polyCirc v
     i <- rndFloat 0.0 n
 
@@ -70,7 +69,6 @@ addExplosionParticle time pos dir vel pw life = do
 
 addExplosion :: Time -> Vector2d -> Vector2d -> Vector2d -> Int -> Float -> Float -> State GameState ()
 addExplosion time pos dir vel n pw life = do
-
     particles <- replicateM n (addExplosionParticle time pos dir vel pw life)
 
     state <- get
@@ -101,7 +99,6 @@ addEngineParticle time thruster speed playerPos playerDir playerVel = do
 
 addEngineParticles :: (GameState -> Thruster) -> (Lifter Thruster Thrusters) -> Time -> Float -> State GameState ()
 addEngineParticles thrusterGetter fp start current = do
-
     state <- get
 
     let time = gs_time state
@@ -124,7 +121,6 @@ addEngineParticles thrusterGetter fp start current = do
 
 addEnginesParticles :: [Action] -> State GameState ()
 addEnginesParticles actions = do
-    
     state <- get
     let (time, prevTime) = (gs_time state, gs_prevTime state)
 
@@ -162,7 +158,6 @@ explodePolygon p pos vel time = do
 
 explodeShip :: State GameState ()
 explodeShip = do
-
     state <- get
 
     let (playerState, time) = (gs_playerState state, gs_time state)

@@ -7,6 +7,7 @@ import Data.List hiding (intersect)
 import Game.Effects
 
 
+rotateVertices :: Asteroid -> Float -> Vertices
 rotateVertices asteroid delta = map (\v -> ( (getTurnMatrix (delta*angVel))#*^(v ^-^ c) ^+^ c)) vs
     where
         c = polyCentroid vs
@@ -45,7 +46,6 @@ splitAsteroid asteroid (p1, p2) t =
 explodeNewAsteroids :: Time -> [Asteroid] -> State GameState ()
 explodeNewAsteroids time [] = return ()
 explodeNewAsteroids time (x:y:zs) = do
-
     let vs = a_vertices x
     addExplosion time (head vs) (normalize ((head vs) ^-^ (last vs))) (a_velocity x) 100 1.5 1.5
     addExplosion time (last vs) (normalize ((last vs) ^-^ (head vs))) (a_velocity y) 15 1 1.5
@@ -55,7 +55,6 @@ explodeNewAsteroids time (x:y:zs) = do
 
 explodeAsteroid :: Asteroid -> State GameState ()
 explodeAsteroid asteroid = do
-
     state <- get
 
     let time = gs_time state
@@ -84,6 +83,7 @@ annihilateAsteroids = do
         return lives) asteroids
 
     state <- get
+
     put $ onAsteroids (\a -> remainder) state
 
 

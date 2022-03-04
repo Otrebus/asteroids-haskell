@@ -137,6 +137,7 @@ data ProgramState = ProgramState {
     gls_menuState :: MenuState,
     gls_introState :: IntroState,
     gls_mode :: ProgramMode,
+    gls_keysHeld :: [GLFW.Key],
     gls_keysPressed :: [GLFW.Key]
 }
 
