@@ -21,7 +21,7 @@ Some of these may be omitted if the corresponding libraries are already installe
 ## Screen capture
 ![Demo](demo.gif)
 
-(Any choppiness is due to the screen → mp4 → gif conversion)
+(The above gif can be choppy depending on the browser used)
 
 ## Disclaimer
 Run at your own risk, program is fair-use etc.

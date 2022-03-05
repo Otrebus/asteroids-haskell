@@ -21,13 +21,13 @@ resizeWindow win w h = do
     GL.viewport GL.$= (GL.Position 0 0, GL.Size (fromIntegral w) (fromIntegral h))
 
 
-initialize :: String -> IO GLFW.Window
-initialize title = do
+initializeWindow :: String -> IO GLFW.Window
+initializeWindow title = do
   GLFW.setErrorCallback $ Just $ const (hPutStrLn stderr)
   
-  successfulInit <- GLFW.init
+  success <- GLFW.init
 
-  if not successfulInit then exitFailure else do
+  if not success then exitFailure else do
       GLFW.windowHint $ GLFW.WindowHint'OpenGLDebugContext True
       GLFW.windowHint $ GLFW.WindowHint'DepthBits (Just 16)
       mw <- GLFW.createWindow 480 480 title Nothing Nothing
@@ -37,6 +37,10 @@ initialize title = do
           Just window -> do
               GLFW.makeContextCurrent mw
               GLFW.setWindowSizeCallback window (Just resizeWindow)
+
+              GLFW.setWindowAspectRatio window $ Just (1, 1)
+              GLFW.setStickyKeysInputMode window GLFW.StickyKeysInputMode'Enabled
+
               return window
 
 
@@ -98,23 +102,20 @@ mainLoop w gls@(ProgramState gameState menuState introState mode input newPresse
 
 main :: IO ()
 main = do
-    window <- initialize "Asteroids"
+    window <- initializeWindow "Asteroids"
     time <- GLFW.getTime
-    GLFW.setWindowAspectRatio window $ Just (1, 1)
-    GLFW.setStickyKeysInputMode window GLFW.StickyKeysInputMode'Enabled
 
     (rng, rng2) <- liftM2 (,) newStdGen newStdGen
 
     let menuState = MenuState Continue
-     
     let gameState = initState 1 0.0 rng
     let introState = IntroState 0.0 0.0 [] (-10.0) rng2
-    let mode = Intro
+
     case time of
         Just t -> do
             let rt = realToFrac t
             let gameStateTimed = gameState { gs_time = rt, gs_prevTime = rt }
-            mainLoop window (ProgramState gameStateTimed menuState introState mode [] []) rt
+            mainLoop window (ProgramState gameStateTimed menuState introState Intro [] []) rt
         Nothing ->
             return ()
 

@@ -3,8 +3,8 @@ cabal-version: 1.12
 name:           asteroids
 version:        0.1.0.0
 description:    Please see the README on GitHub at <https://github.com/otrebus/asteroids#readme>
-homepage:       https://github.com/otrebus/asteroids#readme
-bug-reports:    https://github.com/otrebus/asteroids/issues
+homepage:       https://github.com/otrebus/asteroids-haskell#readme
+bug-reports:    https://github.com/otrebus/asteroids-haskell/issues
 author:         Peter Otrebus-Larsson
 maintainer:     otrebus@gmail.com
 copyright:      2022 Peter Otrebus-Larsson
@@ -15,7 +15,7 @@ build-type:     Simple
 
 source-repository head
   type: git
-  location: https://github.com/Otrebus/asteroids
+  location: https://github.com/Otrebus/asteroids-haskell
 
 executable asteroids-exe
   main-is: Main.hs
