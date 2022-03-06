@@ -205,8 +205,8 @@ handleBullets = do
                    let m = bulletImpact ast bul delta, isJust m]
     let impactedAsteroids = map (\(_, ast, _) -> ast) impacts
 
-    let newPairs = map ((\(bul, ast, Just ((v1, v2), t)) -> splitAsteroid ast (v1, v2) t)) impacts
-    let newAsteroids = concat $ map (\(a, b) -> [a, b]) newPairs
+    let newAsts = map ((\(bul, ast, Just ((v1, v2), t)) -> splitAsteroid 2 ast (v1, v2) t)) impacts
+    let newAsteroids = map (\(a, b) -> a) (concat newAsts)
 
     explodeNewAsteroids time newAsteroids
 

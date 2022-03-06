@@ -78,8 +78,10 @@ type Angle = Float
 idMatrix :: Matrix2d
 idMatrix = Matrix2d 1.0 0.0 0.0 1.0
 
+
 getTurnMatrix :: Angle -> Matrix2d
 getTurnMatrix theta = Matrix2d (cos theta) (-sin(theta)) (sin theta) (cos theta)
+
 
 bbox vs = (minimum . (map xComp) $ vs, minimum . (map yComp) $ vs,
            maximum . (map xComp) $ vs, maximum . (map yComp) $ vs)
