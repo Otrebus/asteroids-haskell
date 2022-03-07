@@ -195,6 +195,22 @@ advanceLevel = do
     }
 
 
+chipAsts :: [(Asteroid, Maybe Edge)] -> State GameState([Asteroid])
+chipAsts [] = return ([])
+chipAsts ((ast, Nothing):asts) = do
+    xs <- chipAsts asts
+    return (ast : xs)
+chipAsts ((ast, Just edge):asts) = do
+    state <- get
+
+    r <- rndFloat 0.0 1
+    u <- rndFloat 0.2 0.5
+    xs <- chipAsts asts
+    if r < 0.2 then return (ast:xs) else return (chip ++ xs)
+    where
+        chip = map fst (splitAsteroid splitChip 1 ast edge 0.3)
+
+
 handleBullets :: State GameState()
 handleBullets = do
     state <- get
@@ -205,10 +221,11 @@ handleBullets = do
                    let m = bulletImpact ast bul delta, isJust m]
     let impactedAsteroids = map (\(_, ast, _) -> ast) impacts
 
-    let newAsts = map ((\(bul, ast, Just ((v1, v2), t)) -> splitAsteroid 2 ast (v1, v2) t)) impacts
-    let newAsteroids = map (\(a, b) -> a) (concat newAsts)
+    let newAsts = map ((\(bul, ast, Just ((v1, v2), t)) -> splitAsteroid splitBalanced 1 ast (v1, v2) t)) impacts
+    chippedAsts <- chipAsts (concat newAsts)
+    let newAsteroids = chippedAsts
 
-    explodeNewAsteroids time newAsteroids
+    explodeNewAsteroids newAsteroids
 
     when ((not . null) impacts) $ do
         state <- get
