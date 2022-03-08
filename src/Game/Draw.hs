@@ -149,6 +149,6 @@ draw gs@(GameState playerState particles polygonParticles bullets asteroids time
         let c = min 1.0 t ** 1.2
         drawPolygon darkGray (gray c) vert
 
-    forM_ asteroids $ \(Asteroid dir vel vert) -> do
+    forM_ asteroids $ \(Asteroid dir vel vert _) -> do
         drawPolygon darkGray white vert
         drawduplicateAsteroids vert

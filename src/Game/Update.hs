@@ -2,6 +2,7 @@ module Game.Update where
 import Utils.Math
 import State
 import Control.Monad.State (State, put, execState, get, when)
+import Data.Ord (comparing)
 import Player
 import qualified Graphics.UI.GLFW as GLFW
 import Data.Maybe
@@ -10,6 +11,7 @@ import Game.Effects
 import Game.Asteroids
 
 
+-- TODO: move to Player.hs
 bulletVel = 0.90 :: Float
 fireInterval = 0.23 :: Float
 accRate = 0.3 :: Float
@@ -93,10 +95,10 @@ detectCollisions = do
     let p1s = map ((^+^ pos) . (rebase dir)) verts
     let tri1s = [map ((^+^ pos) . (rebase dir)) tri | tri <- tris]
 
-    let a = or (map (\(Asteroid _ _ vs) -> detectColl p1s vs (vel^*!(time - prevTime))) asteroids)
-    let b = or (map (\(Asteroid _ _ vs) -> detectColl vs p1s (vel^*!(prevTime - time))) asteroids)
-    let c = or (map (\(Asteroid _ _ vs) -> inside p1s vs) asteroids)
-    let d = or [or (map (\(Asteroid _ _ vs) -> inside vs t) asteroids) | t <- tri1s]
+    let a = or (map (\(Asteroid _ _ vs _) -> detectColl p1s vs (vel^*!(time - prevTime))) asteroids)
+    let b = or (map (\(Asteroid _ _ vs _) -> detectColl vs p1s (vel^*!(prevTime - time))) asteroids)
+    let c = or (map (\(Asteroid _ _ vs _) -> inside p1s vs) asteroids)
+    let d = or [or (map (\(Asteroid _ _ vs _) -> inside vs t) asteroids) | t <- tri1s]
 
     return (a || b || c || d)
 
@@ -195,22 +197,6 @@ advanceLevel = do
     }
 
 
-chipAsts :: [(Asteroid, Maybe Edge)] -> State GameState([Asteroid])
-chipAsts [] = return ([])
-chipAsts ((ast, Nothing):asts) = do
-    xs <- chipAsts asts
-    return (ast : xs)
-chipAsts ((ast, Just edge):asts) = do
-    state <- get
-
-    r <- rndFloat 0.0 1
-    u <- rndFloat 0.2 0.5
-    xs <- chipAsts asts
-    if r < 0.2 then return (ast:xs) else return (chip ++ xs)
-    where
-        chip = map fst (splitAsteroid splitChip 1 ast edge 0.3)
-
-
 handleBullets :: State GameState()
 handleBullets = do
     state <- get
@@ -221,6 +207,7 @@ handleBullets = do
                    let m = bulletImpact ast bul delta, isJust m]
     let impactedAsteroids = map (\(_, ast, _) -> ast) impacts
 
+    let splitBalanced = maximumBy (comparing (\((a, _), (b, _)) -> (calcRatio a)*(calcRatio b)))
     let newAsts = map ((\(bul, ast, Just ((v1, v2), t)) -> splitAsteroid splitBalanced 1 ast (v1, v2) t)) impacts
     chippedAsts <- chipAsts (concat newAsts)
     let newAsteroids = chippedAsts

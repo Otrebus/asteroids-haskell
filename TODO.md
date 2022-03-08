@@ -1,13 +1,4 @@
+* Order polygons correctly after splitting
 * Rename runFrame
-* Combine the newDown stuff for menu and game
 * Be consistent on time/float
-* Unwrap enormous gamestate statements
-* Remove unneeded files
-* Better menu
-
-
-
-
-
-* Rearrange files
-* Unwrap enormous gamestate statements
+* If a polygon doesn't split, it can still chip leading to a minisplit. Good or bad?

@@ -7,6 +7,12 @@ import Data.List hiding (intersect)
 import Game.Effects
 
 
+minSize = 0.002 :: Float
+
+
+type SplitFunction = [(SplitPolygon, SplitPolygon)] -> (SplitPolygon, SplitPolygon)
+
+
 -- Rotates an asteroid over an interval of time and returns the result.
 --
 --   asteroid: The asteroid to rotate
@@ -19,51 +25,41 @@ rotateVertices asteroid delta = map (\v -> ( (getTurnMatrix (delta*angVel))#*^(v
         vs = a_vertices asteroid
 
 
-splitBalanced ::
+split ::
 -- Determines where best to split an asteroid given an impact, and returns the vertex lists
 -- representing the resulting asteroid halves. 
-    Edge ->       -- The near splitting edge (the point of the bullet impact)
-    Float ->      -- The parameter point of the near splitting edge of where the bullet impacted
-    Vertices ->   -- The interior of the left asteroid
-    Edge ->       -- The second splitting edge
-    Vertices ->   -- The interior of the right asteroid
-    ((Vertices, Edge), (Vertices, Edge))
+    SplitFunction -> -- A function that selects the best split out of all pairs of split polygons
+    Edge ->          -- The near splitting edge (the point of the bullet impact)
+    Float ->         -- The parameter point of the near splitting edge of where the bullet impacted
+    Vertices ->      -- The interior of the left asteroid
+    Edge ->          -- The second splitting edge
+    Vertices ->      -- The interior of the right asteroid
+    (SplitPolygon, SplitPolygon)
 
-splitBalanced (p1, p2) t (xs) (v1, v2) [] = (([], undefined), ([], undefined))
-splitBalanced (p1, p2) t (xs) (v1, v2) (y:ys) =
-    maximumBy (comparing (\((a, _), (b, _)) -> (calcRatio a)*(calcRatio b))) (ds:cs)
+split splitFun (p1, p2) t (xs) (v1, v2) [] = (([], undefined), ([], undefined))
+split splitFun (p1, p2) t (xs) (v1, v2) (y:ys) =
+    splitFun (ds:cs)
     where
-        cs = [splitAt u | u <- [0.1, 0.2..1]]
-        ds = splitBalanced (p1, p2) t (xs ++ [v2]) (v2, head ys) (ys)
+        cs = [splitAt u | u <- [0.01, 0.02..1]]
+        ds = split splitFun (p1, p2) t (xs ++ [v2]) (v2, head ys) (ys)
         splitAt s =
             (((interpolate p1 p2 t):xs ++ [interpolate v1 v2 s], (interpolate v1 v2 s, interpolate p1 p2 t)),
              ((interpolate v1 v2 s):y:(ys ++ [interpolate p1 p2 t]), (interpolate p1 p2 t, interpolate v1 v2 s)))
 
 
-splitChip (p1, p2) t (xs) (v1, v2) [] = (([], undefined), ([], undefined))
-splitChip (p1, p2) t (xs) (v1, v2) (y:ys) =
-    minimumBy (comparing (\((a, _), (b, _)) -> abs (10 - (polyArea a)/(polyArea b)))) (ds:cs)
-    where
-        cs = [splitAt u | u <- [0.1, 0.2..1]]
-        ds = splitChip (p1, p2) t (xs ++ [v2]) (v2, head ys) (ys)
-        splitAt s =
-            (((interpolate p1 p2 t):xs ++ [interpolate v1 v2 s], (interpolate v1 v2 s, interpolate p1 p2 t)),
-             ((interpolate v1 v2 s):y:(ys ++ [interpolate p1 p2 t]), (interpolate p1 p2 t, interpolate v1 v2 s)))
-
-
-splitAsteroid :: SplitFunction -> Int -> Asteroid -> Edge -> Float -> [(Asteroid, Maybe Edge)]
+splitAsteroid :: SplitFunction -> Int -> Asteroid -> Edge -> Float -> [Asteroid]
 splitAsteroid splitFun depth asteroid (p1, p2) t
-    | depth == 0 = [(asteroid, Nothing)]
-    | depth == 1 = [(a1, Just r1), (a2, Just r2)]
+    | depth == 0 = [asteroid { a_splitEdge = Nothing }]
+    | depth == 1 = [a1, a2]
     | depth <= 2 = (splitAsteroid splitFun (depth-1) a1 r1 0.5) ++ (splitAsteroid splitFun (depth-1) a2 r2 0.5)
         where
-            a1 = Asteroid (angVel) ((a_velocity asteroid) ^+^ Vector2d (-day) dax ^+^ (normalize a)^*!0.05) as
-            a2 = Asteroid (angVel) ((a_velocity asteroid) ^+^ Vector2d (-dby) dbx ^+^ (normalize b)^*!0.05) bs
+            a1 = Asteroid (angVel) ((a_velocity asteroid) ^+^ Vector2d (-day) dax ^+^ (normalize a)^*!0.05) as (Just r1)
+            a2 = Asteroid (angVel) ((a_velocity asteroid) ^+^ Vector2d (-dby) dbx ^+^ (normalize b)^*!0.05) bs (Just r2)
             Vector2d dax day = a^*!(angVel)
             Vector2d dbx dby = b^*!(angVel)
             a = (polyCentroid as) ^-^ (polyCentroid (a_vertices asteroid))
             b = (polyCentroid bs) ^-^ (polyCentroid (a_vertices asteroid))
-            ((as, r1), (bs, r2)) = splitFun (p1, p2) t [p2] (p2, p3) (p2:takeWhile (/= p2) rest)
+            ((as, r1), (bs, r2)) = split splitFun (p1, p2) t [p2] (p2, p3) (p3:takeWhile (/= p2) rest)
             (_:p3:rest):_ = (dropWhile ((/= p2) . head)) $ maprest (cycle vs)
             vs = a_vertices asteroid
             maprest (x:xs) = (x:xs) : maprest xs
@@ -76,16 +72,34 @@ splitAsteroid splitFun depth asteroid (p1, p2) t
 --  (x:y:zs): The list of asteroids
 explodeNewAsteroids  :: [Asteroid] -> State GameState ()
 explodeNewAsteroids [] = return ()
-explodeNewAsteroids (x:y:zs) = do
-
+explodeNewAsteroids (x@(Asteroid _ _ _ (Just (v1, v2))):xs) = do
     state <- get
     let time = gs_time state
 
     let vs = a_vertices x
-    addExplosion time (head vs) (normalize ((head vs) ^-^ (last vs))) (a_velocity x) 100 1.5 1.5
-    addExplosion time (last vs) (normalize ((last vs) ^-^ (head vs))) (a_velocity y) 15 1 1.5
+    addExplosion time v1 (normalize (v1 ^-^ v2)) (a_velocity x) 100 1.5 1.5
+    addExplosion time v2 (normalize (v2 ^-^ v1)) (a_velocity x) 15 1 1.5
 
-    explodeNewAsteroids zs
+    explodeNewAsteroids xs
+
+
+chipAsts :: [Asteroid] -> State GameState([Asteroid])
+chipAsts [] = return ([])
+chipAsts (ast@(Asteroid _ _ _ Nothing):asts) = do
+    xs <- chipAsts asts
+    return $ (ast { a_splitEdge = Nothing }) : xs
+chipAsts (ast@(Asteroid _ _ _ (Just edge)):asts) = do
+    state <- get
+
+    r <- rndFloat 0.0 1
+    u <- rndFloat 0.2 0.5
+    xs <- chipAsts asts
+    
+    let splitChip = minimumBy (comparing (\((a, _), (b, _)) -> abs (10 - (polyArea a)/(polyArea b))))
+    let chip = splitAsteroid splitChip 1 ast edge u
+    let allBigEnough = all (\a -> (polyArea . a_vertices) a > minSize) chip
+
+    if allBigEnough then return (chip ++ xs) else return $ ast { a_splitEdge = Just edge }:xs
 
 
 explodeAsteroid :: Asteroid -> State GameState ()
@@ -110,7 +124,7 @@ annihilateAsteroids = do
 
     remainder <- filterM (\a -> do
         let area = polyArea (a_vertices a)
-        let lives = area > 0.002
+        let lives = area > minSize
         when (not lives) $ do
             state <- get
             put $ state { gs_score = (gs_score state) + area*10000.0 }

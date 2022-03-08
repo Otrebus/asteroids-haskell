@@ -16,6 +16,7 @@ module State (
     MenuChoice(..),
     Star(..),
     Lifter,
+    SplitPolygon,
     onThrusters,
     onPlayerState,
     onPlayerPos,
@@ -80,8 +81,12 @@ data Bullet = Bullet {
 data Asteroid = Asteroid {
     a_angularVelocity :: Float,
     a_velocity :: Velocity,
-    a_vertices :: Vertices
+    a_vertices :: Vertices,
+    a_splitEdge :: Maybe Edge
 } deriving (Show, Eq)
+
+
+type SplitPolygon = (Vertices, Edge)
 
 
 data Particle = Particle {
@@ -199,6 +204,7 @@ onPolygonParticleVertices f pp = pp { pp_vertices = f (pp_vertices pp) }
 onGameState :: Lifter GameState ProgramState
 onGameState f ps = ps { gls_gameState = f (gls_gameState ps) }
 
+
 rndInt :: Int -> Int -> State GameState (Int)
 rndInt min max = do
     state <- get
@@ -231,7 +237,7 @@ initAsteroids n = do
         velRot <- getRandomR (-0.2, 0.2)
         dir <- fromList [(1, 0.5), (-1, 0.5)]
         let vel = dir !*^ rotate velRot (0.15!*^((normalize . ortho) pos))
-        return (Asteroid (0.25*rtf n) vel poly)
+        return (Asteroid (0.25*rtf n) vel poly Nothing)
 
     where rtf = realToFrac
 

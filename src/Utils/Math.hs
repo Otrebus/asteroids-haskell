@@ -75,8 +75,6 @@ type Time = Float
 
 type Angle = Float
 
-type SplitFunction = Edge -> Float -> Vertices -> Edge -> Vertices -> ((Vertices, Edge), (Vertices, Edge))
-
 idMatrix :: Matrix2d
 idMatrix = Matrix2d 1.0 0.0 0.0 1.0
 
