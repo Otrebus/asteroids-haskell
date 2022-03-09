@@ -96,7 +96,10 @@ drawLife aliveState time max life = drawPolygon black white pm
         pm = map ((Vector2d x 0.92) ^+^) (map ((0.8 !*^) . (rotate (-pi/4))) (fst playerModel))            
 
 
-drawLives :: GameState -> IO ()
+
+-- Draws the ship icons representing the remaining number of lives in the top right corner
+drawLives ::
+    GameState -> IO () -- The resulting state
 drawLives state = do
     let score = gs_score state
     let lives = gs_lives state
@@ -107,7 +110,10 @@ drawLives state = do
 
     return ()
 
-draw :: GameState -> IO ()
+
+-- Displays the current state of the game graphically
+draw ::
+    GameState -> IO () -- The resulting state
 draw gs@(GameState playerState particles polygonParticles bullets asteroids time _ score lives _ _) = do
     clear [ColorBuffer]
 

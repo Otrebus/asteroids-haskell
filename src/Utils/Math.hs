@@ -142,9 +142,6 @@ rotateAround :: Float -> Vector2d -> Vector2d -> Vector2d
 rotateAround theta o v = getTurnMatrix theta#*^(v ^-^ o) ^+^ o
 
 
-moveVertices vel delta = map (\v -> v ^+^ (delta)!*^vel)
-
-
 wrap :: Vector2d -> Vector2d
 wrap (Vector2d x y) = Vector2d (mod' (x + 1.0) 2.0 - 1.0) (mod' (y + 1.0) 2.0 - 1.0)
 

@@ -209,7 +209,7 @@ handleBullets = do
 
     let splitBalanced = maximumBy (comparing (\((a, _), (b, _)) -> (calcRatio a)*(calcRatio b)))
     let newAsts = map ((\(bul, ast, Just ((v1, v2), t)) -> splitAsteroid splitBalanced 1 ast (v1, v2) t)) impacts
-    chippedAsts <- chipAsts (concat newAsts)
+    chippedAsts <- chipAsteroids (concat newAsts)
     let newAsteroids = chippedAsts
 
     explodeNewAsteroids newAsteroids
@@ -254,7 +254,7 @@ runGameFrame actions = do
         gs_time = time,
         gs_particles = updateParticles time delta (gs_particles state),
         gs_bullets = updateBullets time delta (gs_bullets state),
-        gs_asteroids = updateAsteroids time delta (gs_asteroids state),
+        gs_asteroids = updateAsteroids delta (gs_asteroids state),
         gs_polygonParticles = updatePolygonParticles time delta (gs_polygonParticles state)
     }
 
