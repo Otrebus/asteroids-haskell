@@ -94,6 +94,7 @@ explodeNewAsteroids ::
     [Asteroid] ->       -- The asteroids to add explosion particles to along their 
     State GameState ()  -- The resulting game state
 explodeNewAsteroids [] = return ()
+explodeNewAsteroids ((x@(Asteroid _ _ _ Nothing)):xs) = return ()
 explodeNewAsteroids (x@(Asteroid _ _ _ (Just (v1, v2))):xs) = do
     state <- get
     let time = gs_time state

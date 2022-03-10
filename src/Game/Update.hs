@@ -197,29 +197,45 @@ advanceLevel = do
     }
 
 
+handleImpacts :: Time -> [Asteroid] -> State GameState([(Bool, Asteroid)])
+handleImpacts _ [] = return []
+handleImpacts delta (ast:xs) = do
+    rest <- handleImpacts delta xs
+
+    state <- get
+    let bullets = gs_bullets state
+    let impacts = [(bul, ast, m) | bul <- bullets, let m = bulletImpact ast bul delta, isJust m]
+    case ((not . null) $ impacts) of
+        True -> do
+            state <- get
+            put $ state {
+                gs_bullets = filter (\b -> not $ b `elem` ((map (\(i, _, _) -> i) impacts))) (gs_bullets state)
+            }
+
+            let (_, ast, Just ((v1, v2), t)) = head impacts
+            let splitBalanced = maximumBy (comparing (\((a, _), (b, _)) -> (calcRatio a)*(calcRatio b)))
+            x <- chipAsteroids (splitAsteroid splitBalanced 1 ast (v1, v2) t)
+
+            state <- get
+
+            return ((map (\l -> (True, l)) x) ++ rest)
+        False ->
+            return ((False, ast):rest)
+
+
 handleBullets :: State GameState()
 handleBullets = do
     state <- get
 
     let GameState playerState _ _ bullets asteroids time prevTime _ lives _ _ = state
     let delta = time - prevTime
-    let impacts = [(bul, ast, m) | ast <- asteroids, bul <- bullets,
-                   let m = bulletImpact ast bul delta, isJust m]
-    let impactedAsteroids = map (\(_, ast, _) -> ast) impacts
 
-    let splitBalanced = maximumBy (comparing (\((a, _), (b, _)) -> (calcRatio a)*(calcRatio b)))
-    let newAsts = map ((\(bul, ast, Just ((v1, v2), t)) -> splitAsteroid splitBalanced 1 ast (v1, v2) t)) impacts
-    chippedAsts <- chipAsteroids (concat newAsts)
-    let newAsteroids = chippedAsts
+    newAsteroids <- handleImpacts delta asteroids
 
-    explodeNewAsteroids newAsteroids
+    explodeNewAsteroids $ map snd (filter fst newAsteroids)
 
-    when ((not . null) impacts) $ do
-        state <- get
-        put $ state {
-            gs_asteroids = ((gs_asteroids state) \\ impactedAsteroids) ++ newAsteroids,
-            gs_bullets = filter (\b -> (and [(b /= bl) | (bl, _, _) <- impacts])) (gs_bullets state)
-        }
+    state <- get
+    put $ state { gs_asteroids = map snd newAsteroids }
 
 
 runGameFrame :: [Action] -> State GameState ()
@@ -259,7 +275,6 @@ runGameFrame actions = do
     }
 
     annihilateAsteroids
-
     normalizePositions
 
     when (asteroids == [] && (isAlive . ps_aliveState) playerState) $ do
