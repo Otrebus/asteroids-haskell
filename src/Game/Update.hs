@@ -11,13 +11,7 @@ import Game.Effects
 import Game.Asteroids
 
 
--- TODO: move to Player.hs
-bulletVel = 0.90 :: Float
-fireInterval = 0.23 :: Float
-accRate = 0.3 :: Float
-angularAcc = 3.0 :: Float
-
-
+-- As an object moves outside the screen, this makes sure the coordinates eventually wrap around
 normalizePositions :: State GameState ()
 normalizePositions = do
     get >>= put . (onPlayerState . onPlayerPos) wrap
@@ -27,11 +21,13 @@ normalizePositions = do
     get >>= put . (onPolygonParticles (map (onPolygonParticleVertices wrapVertices )))
 
 
+-- Moves bullets
 updateBullets :: Time -> Time -> [Bullet] -> [Bullet]
 updateBullets time deltaT = filter ((>time) . b_lifeTime) . map updbul
     where updbul (Bullet pos dir vel life) = (Bullet (pos ^+^ (deltaT)!*^vel) dir vel life )
 
 
+-- Shoots bullets
 addBullets :: State GameState ()
 addBullets = do
     state <- get
@@ -55,7 +51,12 @@ addBullets = do
         }
 
 
-bulletImpact :: Asteroid -> Bullet -> Float -> Maybe (Edge, Float)
+-- Checks whether an asteroid impacts a bullet during a duration of time
+bulletImpact ::
+    Asteroid ->         -- The asteroid
+    Bullet ->           -- The bullet
+    Float ->            -- The duration of time that they move
+    Maybe (Edge, Float) -- The edge that was hit and the position (in [0, 1]) where it was hit
 bulletImpact asteroid bullet delta = if impacts /= [] then Just (v, t) else Nothing
     where 
           (a, b, v, s, t) = mini
@@ -82,7 +83,9 @@ bulletImpact asteroid bullet delta = if impacts /= [] then Just (v, t) else Noth
           vertices = a_vertices asteroid
 
 
-detectCollisions :: State GameState (Bool)
+-- Detects collisions between the player and the asteroids
+detectCollisions ::
+    State GameState (Bool)
 detectCollisions = do
     state <- get
     let PlayerState pos dir vel _ _ _ _ = gs_playerState state
@@ -106,36 +109,11 @@ detectCollisions = do
                                      p <- ps, (v1, v2) <- polyEdges vs]
 
 
-runFrame :: State ProgramState ()
-runFrame = do
-    let keyCommands = [(GLFW.Key'E, Accelerating),
-                       (GLFW.Key'S, TurningLeft),
-                       (GLFW.Key'D, Decelerating),
-                       (GLFW.Key'F, TurningRight),
-                       (GLFW.Key'Space, Shooting),
-                       (GLFW.Key'Escape, Escaping),
-                       (GLFW.Key'Enter, Entering)]
-
-    state <- get
-
-    let actions = map snd $ filter ((`elem` (gls_keysHeld state)) . fst) keyCommands
-    let newDown = gls_keysPressed state
-
-    put $ state {
-        gls_mode = if GLFW.Key'Escape `elem` newDown then Menu else Playing,
-        gls_gameState = execState (runGameFrame actions) (gls_gameState state)
-    }
-
-    state <- get
-    
-    when ((GLFW.Key'Enter `elem` newDown) && (isGameOver . ps_aliveState . gs_playerState . gls_gameState $ state)) $ do
-        put $ state { gls_mode = Restarting }
-
-    where
-        isGameOver (GameOver _) = True
-        isGameOver _ = False
-
-updatePlayer :: Float -> [Action] -> State GameState ()
+-- Updates the position of the player based on time elapsed and the player's actions
+updatePlayer ::
+    Time ->     -- The amount of time that passed since the last update
+    [Action] -> -- The set of actions that the player is performing
+    State GameState ()
 updatePlayer delta actions = do
     state <- get
 
@@ -173,13 +151,17 @@ updatePlayer delta actions = do
         addBullets
 
 
-initiateRespawn :: State GameState ()
+-- Initializes the respawn animation
+initiateRespawn ::
+    State GameState ()
 initiateRespawn = do
     state <- get
     put $ onPlayerState (\ps -> ps { ps_aliveState = Respawning (gs_time state) } ) state
 
 
-finalizeRespawn :: State GameState ()
+-- After the respawn animation has finished, this is called to get the player starting
+finalizeRespawn ::
+    State GameState ()
 finalizeRespawn = do
     state <- get
     put $ state {
@@ -188,7 +170,9 @@ finalizeRespawn = do
     }
 
 
-advanceLevel :: State GameState ()
+-- Advances the game to the next level with more and bigger asteroids
+advanceLevel ::
+    State GameState ()
 advanceLevel = do
     state <- get
     put $ (initState (1 + (gs_level state)) 0.0 (gs_rng state)) {
@@ -197,7 +181,11 @@ advanceLevel = do
     }
 
 
-handleImpacts :: Time -> [Asteroid] -> State GameState([(Bool, Asteroid)])
+-- Checks for and handles possible impacts of bullets currently traveling in the world
+handleImpacts ::
+    Time ->                              -- The delta of the time that passed since the previous call
+    [Asteroid] ->                        -- The asteroids in the world
+    State GameState([(Bool, Asteroid)])  -- Each asteroid and whether it was hit
 handleImpacts _ [] = return []
 handleImpacts delta (ast:xs) = do
     rest <- handleImpacts delta xs
@@ -223,6 +211,7 @@ handleImpacts delta (ast:xs) = do
             return ((False, ast):rest)
 
 
+-- Handles the effects of bullets that are currently travelling through the world
 handleBullets :: State GameState()
 handleBullets = do
     state <- get
@@ -238,7 +227,11 @@ handleBullets = do
     put $ state { gs_asteroids = map snd newAsteroids }
 
 
-runGameFrame :: [Action] -> State GameState ()
+-- The top level function of the gameplay loop that invokes other functions to update the game
+-- based on the actions of the player and the behavior of the gameplay objects
+runGameFrame ::
+    [Action] ->        -- The current input of the player
+    State GameState ()
 runGameFrame actions = do
     state <- get
 
@@ -283,3 +276,35 @@ runGameFrame actions = do
 
     where isAlive Alive = True
           isAlive _ = False
+
+
+-- Changes the global state of the program depending on the player's actions (escaping to the menu, for example)
+runFrame ::
+    State ProgramState ()
+runFrame = do
+    let keyCommands = [(GLFW.Key'E, Accelerating),
+                       (GLFW.Key'S, TurningLeft),
+                       (GLFW.Key'D, Decelerating),
+                       (GLFW.Key'F, TurningRight),
+                       (GLFW.Key'Space, Shooting),
+                       (GLFW.Key'Escape, Escaping),
+                       (GLFW.Key'Enter, Entering)]
+
+    state <- get
+
+    let actions = map snd $ filter ((`elem` (gls_keysHeld state)) . fst) keyCommands
+    let newDown = gls_keysPressed state
+
+    put $ state {
+        gls_mode = if GLFW.Key'Escape `elem` newDown then Menu else Playing,
+        gls_gameState = execState (runGameFrame actions) (gls_gameState state)
+    }
+
+    state <- get
+    
+    when ((GLFW.Key'Enter `elem` newDown) && (isGameOver . ps_aliveState . gs_playerState . gls_gameState $ state)) $ do
+        put $ state { gls_mode = Restarting }
+
+    where
+        isGameOver (GameOver _) = True
+        isGameOver _ = False

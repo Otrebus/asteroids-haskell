@@ -10,7 +10,11 @@ import Control.Monad.State
 import Utils.Font
 
 
-drawStars :: [Star] -> Time -> IO ()
+-- Draws stars
+drawStars ::
+    [Star] ->  -- The set of stars
+    Time ->    -- The current time
+    IO ()
 drawStars particles time = do
     renderPrimitive Points $ forM_ particles $ \s -> do
         let Star (Vector2d x y) spawnTime = s
@@ -28,7 +32,11 @@ drawStars particles time = do
         | otherwise = 0.65
 
 
-draw :: GLFW.Window -> IntroState -> IO ()
+-- Draws the intro screen
+draw ::
+    GLFW.Window -> -- The window
+    IntroState ->  -- The current state of the intro
+    IO () 
 draw window introState = do
     clear [ColorBuffer]
 

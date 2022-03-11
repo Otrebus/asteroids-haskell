@@ -1,7 +1,17 @@
 module Game.Draw where
 
 import qualified Graphics.Rendering.OpenGL as GL hiding (get, rotate)
-import Graphics.Rendering.OpenGL (vertex, clear, ClearBuffer(ColorBuffer), renderPrimitive, PrimitiveMode(Points, TriangleStrip, LineLoop, TriangleFan))
+import Graphics.Rendering.OpenGL (
+    vertex,
+    clear,
+    ClearBuffer(ColorBuffer),
+    renderPrimitive,
+    PrimitiveMode(
+        Points,
+        TriangleStrip,
+        LineLoop,
+        TriangleFan)
+    )
 import Utils.Font
 import Utils.Math
 import State
@@ -11,7 +21,11 @@ import Player
 import Utils.Rendering
 
 
-drawParticles :: Time -> [Particle] -> IO ()
+-- Draws particles (dots)
+drawParticles ::
+    Time ->       -- The current time
+    [Particle] -> -- The particles to draw
+    IO ()
 drawParticles time particles = do
     renderPrimitive Points $ forM_ particles renderParticle where
         renderParticle (Particle pos _ start life bri) = do
@@ -20,7 +34,12 @@ drawParticles time particles = do
             vertex $ toVertex pos
 
 
-drawPolygon :: GL.Color4 Float -> GL.Color4 Float -> Vertices -> IO ()
+-- Draws an OpenGL polygon on the screen
+drawPolygon ::
+    GL.Color4 Float -> -- The foreground color
+    GL.Color4 Float -> -- The interior color
+    Vertices ->        -- The vertices of the polygon
+    IO ()
 drawPolygon back fore verts = do
     GL.color $ back
     renderPrimitive TriangleFan $ do mapM_ vertex (map toVertex verts)
@@ -29,7 +48,10 @@ drawPolygon back fore verts = do
     return ()
 
 
-drawObject :: Object -> IO ()
+-- Draws an object on the screen
+drawObject ::
+    Object -> -- The object to draw
+    IO ()
 drawObject (Object (lineVertices, triangles) (Vector2d a b) pos) = do
     let mat = Matrix2d b a (-a) b
     let tris = map (\v -> (map (toVertex . (pos ^+^) . ((#*^) mat)) v)) triangles
@@ -43,7 +65,10 @@ drawObject (Object (lineVertices, triangles) (Vector2d a b) pos) = do
     return ()
 
 
-drawDuplicateObjects :: Object -> IO ()
+-- Draws an object as it toroidally wraps around the edges of the screen
+drawDuplicateObjects ::
+    Object -> -- The object to draw
+    IO ()
 drawDuplicateObjects (Object (vectors, tris) dir pos) = do
     let (Vector2d x y) = pos
     let (Vector2d a b) = dir
@@ -61,8 +86,11 @@ drawDuplicateObjects (Object (vectors, tris) dir pos) = do
         drawObject (Object (vectors, tris) dir (pos ^+^ v))
 
 
-drawduplicateAsteroids :: Vertices -> IO ()
-drawduplicateAsteroids vectors = do
+-- Draws an asteroid as it toroidally wraps around the edges of the screen
+drawduplicateAsteroid ::
+    Vertices -> -- The vertices of the asteroid
+    IO ()
+drawduplicateAsteroid vectors = do
     let (Vector2d x y) = polyCentroid vectors
 
     let a = 2*(-signum x) :: Float
@@ -76,7 +104,14 @@ drawduplicateAsteroids vectors = do
         drawPolygon darkGray white $ map (^+^ v) vectors
 
 
-drawLife :: AliveState -> Float -> Int -> Int -> IO ()
+-- Draws the animation of the ship icon moving from the top right to the ship position in the game
+-- as the player is respawning
+drawLife ::
+    AliveState -> -- Whether the player is currently being respawned or playing
+    Time ->      --  The current time
+    Int ->       --  The maximum number of lives
+    Int ->       --  The current number of lives
+    IO ()
 drawLife (Respawning since) time maxLife life = drawPolygon black white pm
     where
         x = 0.92 - ((realToFrac life - 1.0))*0.12
@@ -157,4 +192,4 @@ draw gs@(GameState playerState particles polygonParticles bullets asteroids time
 
     forM_ asteroids $ \(Asteroid dir vel vert _) -> do
         drawPolygon darkGray white vert
-        drawduplicateAsteroids vert
+        drawduplicateAsteroid vert

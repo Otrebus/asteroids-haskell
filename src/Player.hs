@@ -11,9 +11,12 @@ module Player (
     startDir,
     startVel,
     plT,
+    bulletVel,
+    fireInterval,
+    accRate,
+    angularAcc,
     Thrusters(..),
     Thruster(..),
-
  ) where
 import Utils.Math
 
@@ -61,3 +64,9 @@ bulletModel = ([blL, blT, blR, blB], [[blL, blT, blR, blB]])
 startPos = (Vector2d 0 0)
 startDir = normalize (Vector2d 0.2 0.5)
 startVel = (Vector2d 0.0 0.0)
+
+
+bulletVel = 0.90 :: Float
+fireInterval = 0.23 :: Float
+accRate = 0.3 :: Float
+angularAcc = 3.0 :: Float

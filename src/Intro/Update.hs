@@ -7,7 +7,11 @@ import System.Random
 import Control.Monad.State
 
 
-rndFloat :: Float -> Float -> State IntroState (Float)
+-- Returns a new random float between two numbers
+rndFloat ::
+    Float -> -- The low number
+    Float -> -- The high number
+    State IntroState (Float)
 rndFloat min max = do
     state <- get
     let (value, newGenerator) = randomR (min, max) (is_rng state)
@@ -15,7 +19,11 @@ rndFloat min max = do
     return value
 
 
-spawnStars :: Float -> Float -> State IntroState ()
+-- Spawns new stars in the starfield
+spawnStars ::
+    Float -> -- The last time a star was spawned
+    Float -> -- The current time
+    State IntroState ()
 spawnStars lastStar time = do
     state <- get
 
@@ -38,6 +46,7 @@ spawnStars lastStar time = do
         spawnStars nextStar time
 
 
+-- Runs one frame of the intro
 runFrame :: State ProgramState ()
 runFrame = do
     state <- get
@@ -54,8 +63,9 @@ runFrame = do
 
     return ()
 
-
-runIntroFrame :: State IntroState ()
+-- Runs one frame of the intro
+runIntroFrame ::
+    State IntroState ()
 runIntroFrame = do
     state <- get
     spawnStars (is_lastStar state) (is_time state)
