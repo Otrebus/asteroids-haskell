@@ -48,7 +48,7 @@ drawPolygon back fore verts = do
     return ()
 
 
--- Draws an object on the screen
+-- Draws an object, consisting of a set of triangles, on the screen
 drawObject ::
     Object -> -- The object to draw
     IO ()

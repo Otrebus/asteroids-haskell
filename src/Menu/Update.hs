@@ -5,6 +5,7 @@ import Control.Monad.State
 import qualified Graphics.UI.GLFW as GLFW
 
 
+-- Updates the menu and the state of the program based on the player's actions in the menu
 runFrame :: State ProgramState ()
 runFrame = do
     

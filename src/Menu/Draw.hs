@@ -10,14 +10,22 @@ import qualified Graphics.UI.GLFW as GLFW
 import Player
 
 
-drawCursor :: Float -> Float -> IO ()
+-- Draws the cursor next to selected menu item
+drawCursor ::
+    Float -> -- The x position of the cursor
+    Float -> -- The y position of the cursor
+    IO ()
 drawCursor x y = do
     drawPolygon black white pm
     where
         pm = map ((0.8 !*^) . ((Vector2d x y) ^+^)) (map (rotate (-pi/2)) (fst playerModel))
 
 
-draw :: GLFW.Window -> MenuState -> IO ()
+-- Draws the menu
+draw ::
+    GLFW.Window -> -- The window
+    MenuState ->   -- The state of the menu
+    IO ()
 draw window menuState = do
     clear [ColorBuffer]
 

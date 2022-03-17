@@ -5,7 +5,11 @@ import Control.Monad.State (State, put, get, when, liftM, forM_, replicateM)
 import Player
 
 
-randomPolyDivision :: [Vector2d] -> Int -> State GameState [[Vector2d]]
+-- Randomly splits a polygon into smaller polygons
+randomPolyDivision ::
+    [Vector2d] ->                -- The input polygon
+    Int ->                       -- The number of recursions
+    State GameState [[Vector2d]] -- The output polygons
 randomPolyDivision vs 0 = return [vs]
 randomPolyDivision v r = do
     let n = polyCirc v
@@ -31,7 +35,13 @@ randomPolyDivision v r = do
                 l = len (v2 ^-^ v1)
 
 
-updateParticles :: Time -> Time -> [Particle] -> [Particle]
+-- Moves the current particles according to their velocities and culls the particles that have
+-- reached their lifetime or are too faint
+updateParticles ::
+    Time ->       -- The current time
+    Time ->       -- The time step, amount of time since the last calculation
+    [Particle] -> -- The input particles
+    [Particle]    -- The output particles
 updateParticles time deltaT particles = newParticles
     where
         filteredParticles = filter ((>time) . p_lifeTime) $ filter ((>0.01) . (p_brightness)) particles
@@ -40,7 +50,12 @@ updateParticles time deltaT particles = newParticles
             in  Particle newPos vel start life bri)) filteredParticles
 
 
-updatePolygonParticles :: Time -> Time -> [PolygonParticle] -> [PolygonParticle]
+-- Same as updateParticles but for polygon Particles
+updatePolygonParticles ::
+    Time -> -- The current time
+    Time -> -- Amount of time since the last update
+    [PolygonParticle] -> -- The input
+    [PolygonParticle]    -- The output
 updatePolygonParticles time deltaT particles = newParticles
     where
         filteredParticles = filter ((>time) . pp_lifeTime) $ particles
@@ -49,7 +64,15 @@ updatePolygonParticles time deltaT particles = newParticles
                 PolygonParticle (map newPos polys) vel angVel life)) filteredParticles
 
 
-addExplosionParticle :: Time -> Vector2d -> Vector2d -> Vector2d -> Float -> Float -> State GameState (Particle)
+-- Adds an explosion particle
+addExplosionParticle ::
+    Time ->     -- The current time
+    Vector2d -> -- The position at which to add it
+    Vector2d -> -- The general direction it is travelling
+    Vector2d -> -- A velocity offset to add to it
+    Float ->    -- How focused the explosion is along its direction
+    Float ->    -- How long the particle should last
+    State GameState (Particle)
 addExplosionParticle time pos dir vel pw life = do
 
     t <- rndFloat 0 1
@@ -67,7 +90,16 @@ addExplosionParticle time pos dir vel pw life = do
     return (Particle ppos (pvel ^+^ vel) time (time + life*lt) 0.8)
 
 
-addExplosion :: Time -> Vector2d -> Vector2d -> Vector2d -> Int -> Float -> Float -> State GameState ()
+-- Adds a number of explosion particles
+addExplosion ::
+    Time ->     -- The current time
+    Vector2d -> -- The position at which to add it
+    Vector2d -> -- The general direction it is travelling
+    Vector2d -> -- A velocity offset to add to it
+    Int ->      -- The number of particles to spawn
+    Float ->    -- How focused the explosion is along its direction
+    Float ->    -- How long the particle should last
+    State GameState ()
 addExplosion time pos dir vel n pw life = do
     particles <- replicateM n (addExplosionParticle time pos dir vel pw life)
 
@@ -75,7 +107,15 @@ addExplosion time pos dir vel n pw life = do
     put (state { gs_particles = particles ++ (gs_particles state) } )
 
 
-addEngineParticle :: Float -> Thruster -> Float -> Position -> Direction -> Velocity -> State GameState ()
+-- Adds an exhaust particle to an engine
+addEngineParticle ::
+    Float ->     -- The lifetime of the particle
+    Thruster ->  -- The thruster to add it to
+    Float ->     -- The speed of the exhaust
+    Position ->  -- The position of the player
+    Direction -> -- The direction of the player
+    Velocity ->  -- The velocity of the player
+    State GameState ()
 addEngineParticle time thruster speed playerPos playerDir playerVel = do
     let newPos = rebase playerDir (t_position thruster)
     let newDir = rebase playerDir (t_direction thruster)
@@ -97,7 +137,13 @@ addEngineParticle time thruster speed playerPos playerDir playerVel = do
     put $ onParticles ((:) (Particle pos vel time lifeTime brightness)) state
 
 
-addEngineParticles :: (GameState -> Thruster) -> (Lifter Thruster Thrusters) -> Time -> Float -> State GameState ()
+-- Adds a number of engine particles
+addEngineParticles ::
+    (GameState -> Thruster) ->     -- The thruster getter
+    (Lifter Thruster Thrusters) -> -- The specific thruster SEC
+    Time ->                        -- The start of the time period of which to add particles
+    Time ->                        -- The length of the time period
+    State GameState ()
 addEngineParticles thrusterGetter fp start current = do
     state <- get
 
@@ -119,7 +165,10 @@ addEngineParticles thrusterGetter fp start current = do
         addEngineParticles thrusterGetter fp start nextT
 
 
-addEnginesParticles :: [Action] -> State GameState ()
+-- Adds exhaust particles to all engines given the set of current actions
+addEnginesParticles ::
+    [Action] -> -- The current control actions currently taken
+    State GameState ()
 addEnginesParticles actions = do
     state <- get
     let (time, prevTime) = (gs_time state, gs_prevTime state)
@@ -137,7 +186,13 @@ addEnginesParticles actions = do
         when (ac `elem` actions) $ addEngineParticles th fp t t
 
 
-explodePolygon :: Vertices -> Vector2d -> Vector2d -> Float -> State GameState ()
+-- Explodes a polygon into random bits and particles
+explodePolygon ::
+    Vertices -> -- The vertices of the polygon
+    Vector2d -> -- The position 
+    Vector2d -> -- The center of the explosion
+    Time ->     -- The current time
+    State GameState ()
 explodePolygon p pos vel time = do
     state <- get
     newPs <- randomPolyDivision p 4
@@ -156,6 +211,7 @@ explodePolygon p pos vel time = do
             return (PolygonParticle poly (vel ^+^ polyVel) (dirAng*angVel) (time + 1.0))
 
 
+-- Explodes the player's ship
 explodeShip :: State GameState ()
 explodeShip = do
     state <- get
