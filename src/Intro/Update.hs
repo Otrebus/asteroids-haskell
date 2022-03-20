@@ -65,8 +65,7 @@ runFrame = do
 
 
 -- Runs one frame of the intro
-runIntroFrame ::
-    State IntroState ()
+runIntroFrame :: State IntroState ()
 runIntroFrame = do
     state <- get
     spawnStars (is_lastStar state) (is_time state)

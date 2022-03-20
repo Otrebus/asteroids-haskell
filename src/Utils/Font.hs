@@ -33,7 +33,7 @@ drawText ::
 drawText size pos = foldM_ (drawChar size) pos
 
 
--- Draws text centered on a box
+-- Draws text centered in a box
 centerText ::
     Float ->    -- The size of the text
     Vector2d -> -- The top left of the box

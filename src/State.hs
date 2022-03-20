@@ -146,6 +146,8 @@ data ProgramState = ProgramState {
     gls_keysPressed :: [GLFW.Key]
 }
 
+-- The semantic editor combinators to access state
+
 type Unop a = a -> a
 
 type Lifter p q = Unop p -> Unop q
@@ -205,7 +207,11 @@ onGameState :: Lifter GameState ProgramState
 onGameState f ps = ps { gls_gameState = f (gls_gameState ps) }
 
 
-rndInt :: Int -> Int -> State GameState (Int)
+-- Returns an integer between two numbers
+rndInt ::
+    Int -> -- The lower bound
+    Int -> -- The upper bound
+    State GameState (Int)
 rndInt min max = do
     state <- get
     let (value, newGenerator) = randomR (min, max) (gs_rng state)
@@ -213,7 +219,11 @@ rndInt min max = do
     return value
 
 
-rndFloat :: Float -> Float -> State GameState (Float)
+-- Returns a float between two numbers
+rndFloat ::
+    Float -> -- The lower bound
+    Float -> -- The upper bound
+    State GameState (Float)
 rndFloat min max = do
     state <- get
     let (value, newGenerator) = randomR (min,max) (gs_rng state)
@@ -221,7 +231,11 @@ rndFloat min max = do
     return value
 
 
-initAsteroids :: Int -> Rand StdGen [Asteroid]
+
+-- Initializes a set of asteroids on the screen
+initAsteroids ::
+    Int -> -- The number of asteroids to add
+    Rand StdGen [Asteroid]
 initAsteroids n = do
 
     let size = 0.15*rtf n
@@ -242,7 +256,12 @@ initAsteroids n = do
     where rtf = realToFrac
 
 
-initState :: Int -> Float -> StdGen -> GameState
+-- Initializes the state of the game
+initState ::
+    Int ->    -- The game level
+    Float ->  -- The current score
+    StdGen -> -- The random number generator
+    GameState
 initState level score rng =
     let (asteroids, rnd) = runRand (initAsteroids level) rng
         initPlayerState = PlayerState startPos startDir startVel 0 thrusters score Alive

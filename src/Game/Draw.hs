@@ -57,7 +57,7 @@ drawObject (Object (lineVertices, triangles) (Vector2d a b) pos) = do
     let tris = map (\v -> (map (toVertex . (pos ^+^) . ((#*^) mat)) v)) triangles
     let ys = map (toVertex . (pos ^+^) . ((#*^) mat)) lineVertices
 
-    GL.color black
+    GL.color darkGray
     forM_ tris (\tri -> renderPrimitive TriangleStrip $ (do mapM_ vertex tri))
 
     GL.color white

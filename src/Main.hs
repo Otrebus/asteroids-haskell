@@ -15,13 +15,27 @@ import Game.Draw
 import Menu.Draw
 import Intro.Draw
 
+import Debug.Trace
 
+
+-- Called on window resize
 resizeWindow :: GLFW.WindowSizeCallback
 resizeWindow win w h = do
     GL.viewport GL.$= (GL.Position 0 0, GL.Size (fromIntegral w) (fromIntegral h))
 
 
-initializeWindow :: String -> IO GLFW.Window
+-- Called on window maximize
+maximizeWindow :: GLFW.WindowMaximizeCallback
+maximizeWindow win _ = do
+    GLFW.setWindowAspectRatio win $ Just (1, 1)
+    (a, b) <- GLFW.getWindowSize win
+    GLFW.setWindowSize win b b
+
+
+-- Initializes the window
+initializeWindow ::
+    String ->      -- The title bar name of the window
+    IO GLFW.Window
 initializeWindow title = do
   GLFW.setErrorCallback $ Just $ const (hPutStrLn stderr)
   
@@ -37,21 +51,32 @@ initializeWindow title = do
           Just window -> do
               GLFW.makeContextCurrent mw
               GLFW.setWindowSizeCallback window (Just resizeWindow)
+              GLFW.setWindowMaximizeCallback window (Just maximizeWindow)
 
               GLFW.setWindowAspectRatio window $ Just (1, 1)
               GLFW.setStickyKeysInputMode window GLFW.StickyKeysInputMode'Enabled
 
+              GLFW.setWindowAspectRatio window $ Just (1, 1)
+
               return window
 
 
-getInput :: GLFW.Window -> IO [GLFW.Key]
+-- Gets input
+getInput ::
+    GLFW.Window -> -- The GLFW window handle
+    IO [GLFW.Key]
 getInput window = filterM (isPressed window) keys
     where isPressed window key = liftM2 (==) (GLFW.getKey window key) (return GLFW.KeyState'Pressed)
           keys = [GLFW.Key'E, GLFW.Key'S, GLFW.Key'D, GLFW.Key'F,
                   GLFW.Key'Space, GLFW.Key'Escape, GLFW.Key'Enter]
 
 
-mainLoop :: GLFW.Window -> ProgramState -> Time -> IO ()
+-- The main loop of the program, reads input and executes a frame
+mainLoop ::
+    GLFW.Window ->  -- The GLFW window handle
+    ProgramState -> -- The state of the program
+    Time ->         -- The previous time the function was invoked
+    IO ()
 mainLoop w gls@(ProgramState gameState menuState introState mode input newPressed) prevTime = do
     close <- GLFW.windowShouldClose w
 
@@ -100,9 +125,11 @@ mainLoop w gls@(ProgramState gameState menuState introState mode input newPresse
                 where deltaTime = (realToFrac time) - prevTime
 
 
+-- The entry point of the program, initializes the window and game state
 main :: IO ()
 main = do
     window <- initializeWindow "Asteroids"
+
     time <- GLFW.getTime
 
     (rng, rng2) <- liftM2 (,) newStdGen newStdGen
