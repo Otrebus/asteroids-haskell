@@ -55,7 +55,7 @@ addBullets = do
 bulletImpact ::
     Asteroid ->         -- The asteroid
     Bullet ->           -- The bullet
-    Float ->            -- The duration of time that they move
+    Time ->            -- The duration of time that they move
     Maybe (Edge, Float) -- The edge that was hit and the position (in [0, 1]) where it was hit
 bulletImpact asteroid bullet delta = if impacts /= [] then Just (v, t) else Nothing
     where 

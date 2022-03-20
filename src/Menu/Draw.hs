@@ -16,17 +16,16 @@ drawCursor ::
     Float -> -- The y position of the cursor
     IO ()
 drawCursor x y = do
-    drawPolygon black white pm
+    drawFigure white black (pm, [pm])
     where
         pm = map ((0.8 !*^) . ((Vector2d x y) ^+^)) (map (rotate (-pi/2)) (fst playerModel))
 
 
 -- Draws the menu
 draw ::
-    GLFW.Window -> -- The window
     MenuState ->   -- The state of the menu
     IO ()
-draw window menuState = do
+draw menuState = do
     clear [ColorBuffer]
 
     -- Hard-coded, if this were to grow into an actual menu I'd do this differently

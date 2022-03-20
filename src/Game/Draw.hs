@@ -34,18 +34,48 @@ drawParticles time particles = do
             vertex $ toVertex pos
 
 
--- Draws an OpenGL polygon on the screen
-drawPolygon ::
-    GL.Color4 Float -> -- The foreground color
-    GL.Color4 Float -> -- The interior color
-    Vertices ->        -- The vertices of the polygon
+-- Draws an object consisting of a set of convex interior polygons and a perimeter polygon
+drawFigure ::
+    GL.Color4 Float ->        -- The foreground color
+    GL.Color4 Float ->        -- The interior color
+    (Vertices, [Vertices]) -> -- The figures to draw (perimeter, interior polygons)
     IO ()
-drawPolygon back fore verts = do
-    GL.color $ back
-    renderPrimitive TriangleFan $ do mapM_ vertex (map toVertex verts)
-    GL.color $ fore
-    renderPrimitive LineLoop $ do mapM_ vertex (map toVertex verts)
+drawFigure fore back (verts, tris) = do
+    GL.color back
+    forM_ tris (\tri -> renderPrimitive TriangleFan $ mapM (vertex . toVertex) tri)
+
+    GL.color fore
+    renderPrimitive LineLoop $ mapM (vertex . toVertex) verts
     return ()
+
+
+-- Draws an object as it toroidally wraps around the edges of the screen
+drawDuplicateFigures ::
+    GL.Color4 Float ->        -- The foreground color
+    GL.Color4 Float ->        -- The interior color
+    (Vertices, [Vertices]) -> -- The figures to draw (perimeter, interior polygons)
+    IO ()
+drawDuplicateFigures fore back (vectors, tris) = do
+    let (Vector2d x y) = polyCentroid vectors
+
+    let a = 2*(-signum x) :: Float
+    let b = 2*(-signum y) :: Float
+
+    let wrap = [Vector2d a 0.0, Vector2d 0.0 b, Vector2d a 0.0, Vector2d a b]
+
+    forM_ wrap $ \v -> do
+        drawFigure fore back (map (^+^ v) vectors, map (map (^+^ v)) tris)
+
+
+-- Turns an object with its position and orientation into a pair of interior polygons and
+-- perimeter polygon
+transform :: Object -> (Vertices, [Vertices])
+transform (Object (lineVertices, triangles) (Vector2d a b) pos) =
+    let mat = Matrix2d b a (-a) b
+        tris = map (\v -> (map ((pos ^+^) . ((#*^) mat))) v) triangles
+        ys = map ((pos ^+^) . ((#*^) mat)) lineVertices
+
+    in (ys, tris)
 
 
 -- Draws an object, consisting of a set of triangles, on the screen
@@ -65,45 +95,6 @@ drawObject (Object (lineVertices, triangles) (Vector2d a b) pos) = do
     return ()
 
 
--- Draws an object as it toroidally wraps around the edges of the screen
-drawDuplicateObjects ::
-    Object -> -- The object to draw
-    IO ()
-drawDuplicateObjects (Object (vectors, tris) dir pos) = do
-    let (Vector2d x y) = pos
-    let (Vector2d a b) = dir
-    let mat = Matrix2d b a (-a) b
-    let mv = map ((pos ^+^) . ((#*^) mat)) vectors
-
-    let fx (Vector2d x y) = x; fy (Vector2d x y) = y
-
-    let a = 2*(-signum x) :: Float
-    let b = 2*(-signum y) :: Float
-
-    let wrap = [Vector2d a 0.0, Vector2d 0.0 b, Vector2d a 0.0, Vector2d a b]
-
-    forM_ wrap $ \v -> do
-        drawObject (Object (vectors, tris) dir (pos ^+^ v))
-
-
--- Draws an asteroid as it toroidally wraps around the edges of the screen
-drawduplicateAsteroid ::
-    Vertices -> -- The vertices of the asteroid
-    IO ()
-drawduplicateAsteroid vectors = do
-    let (Vector2d x y) = polyCentroid vectors
-
-    let a = 2*(-signum x) :: Float
-    let b = 2*(-signum y) :: Float
-
-    let fx (Vector2d x y) = x; fy (Vector2d x y) = y
-
-    let wrap = [Vector2d a 0.0, Vector2d 0.0 b, Vector2d a 0.0, Vector2d a b]
-
-    forM_ wrap $ \v -> do
-        drawPolygon darkGray white $ map (^+^ v) vectors
-
-
 -- Draws the animation of the ship icon moving from the top right to the ship position in the game
 -- as the player is respawning
 drawLife ::
@@ -112,7 +103,7 @@ drawLife ::
     Int ->       --  The maximum number of lives
     Int ->       --  The current number of lives
     IO ()
-drawLife (Respawning since) time maxLife life = drawPolygon black white pm
+drawLife (Respawning since) time maxLife life = drawFigure white black (pm, [pm])
     where
         x = 0.92 - ((realToFrac life - 1.0))*0.12
         t = 2.0*(time - since)
@@ -125,11 +116,10 @@ drawLife (Respawning since) time maxLife life = drawPolygon black white pm
         (pos, rot, scale) = if maxLife == life then (movePos, moveRot, moveScale) else ((Vector2d x 0.92), -pi/4, 0.8)
         pm = map (pos ^+^) (map ((scale !*^) . (rotate (rot))) (fst playerModel))
     
-drawLife aliveState time max life = drawPolygon black white pm
+drawLife aliveState time max life = drawFigure white black (pm, [pm])
     where
         x = 0.92 - ((realToFrac life - 1.0))*0.12
         pm = map ((Vector2d x 0.92) ^+^) (map ((0.8 !*^) . (rotate (-pi/4))) (fst playerModel))            
-
 
 
 -- Draws the ship icons representing the remaining number of lives in the top right corner
@@ -148,7 +138,8 @@ drawLives state = do
 
 -- Displays the current state of the game graphically
 draw ::
-    GameState -> IO () -- The resulting state
+    GameState -> -- The state of the game
+    IO ()
 draw gs@(GameState playerState particles polygonParticles bullets asteroids time _ score lives _ _) = do
     clear [ColorBuffer]
 
@@ -161,8 +152,7 @@ draw gs@(GameState playerState particles polygonParticles bullets asteroids time
 
     case aliveState of
         Alive -> do
-            drawObject $ Object playerModel (ps_direction playerState) (ps_position playerState)
-            drawDuplicateObjects $ Object playerModel (ps_direction playerState) (ps_position playerState)
+            drawWrap $ transform $ Object playerModel (ps_direction playerState) (ps_position playerState)
         Exploding since -> do
             when (time - since > 1.0) $ do
                 when (lives > 0) $ do
@@ -171,8 +161,7 @@ draw gs@(GameState playerState particles polygonParticles bullets asteroids time
             centerText 0.15 (Vector2d (-0.3) 0.15) (Vector2d 0.3 0.0) "Game Over"
             centerText 0.09 (Vector2d (-0.3) (-0.15)) (Vector2d 0.3 0.0) "Press enter to restart"
         Winning since -> do 
-            drawObject $ Object playerModel (ps_direction playerState) (ps_position playerState)
-            drawDuplicateObjects $ Object playerModel (ps_direction playerState) (ps_position playerState)
+            drawWrap $ transform $ Object playerModel (ps_direction playerState) (ps_position playerState)
             when (time - since > 0.5) $ do
                 centerText 0.15 (Vector2d (-0.3) 0.15) (Vector2d 0.3 0.0) "Level complete"
                 centerText 0.09 (Vector2d (-0.3) (-0.15)) (Vector2d 0.3 0.0) "Press enter to continue"
@@ -182,14 +171,17 @@ draw gs@(GameState playerState particles polygonParticles bullets asteroids time
     drawParticles time particles
 
     forM_ bullets $ \(Bullet pos dir vel _) -> do
-        drawObject (Object bulletModel dir pos)
-        drawDuplicateObjects (Object bulletModel dir pos)
+        drawWrap $ transform $ Object bulletModel dir pos
 
     forM_ polygonParticles $ \(PolygonParticle vert vel angVel life) -> do
         let t = abs (life - time)
         let c = min 1.0 t ** 1.2
-        drawPolygon darkGray (gray c) vert
+        drawFigure (gray c) black (vert, [vert])
 
     forM_ asteroids $ \(Asteroid dir vel vert _) -> do
-        drawPolygon darkGray white vert
-        drawduplicateAsteroid vert
+        drawWrap (vert, [vert])
+
+    where
+        drawWrap obj = do
+            (drawFigure white darkGray) obj
+            (drawDuplicateFigures white darkGray) obj

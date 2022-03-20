@@ -31,8 +31,8 @@ data Thrusters = Thrusters {
 
 
 data Thruster = Thruster {
-    t_lastEmitted :: Float,
-    t_emissionInterval :: Float,
+    t_lastEmitted :: Time,
+    t_emissionInterval :: Time,
     t_position :: Vector2d,
     t_direction :: Vector2d
 } deriving (Show)
@@ -66,7 +66,7 @@ startDir = normalize (Vector2d 0.2 0.5)
 startVel = (Vector2d 0.0 0.0)
 
 
-bulletVel = 0.90 :: Float
-fireInterval = 0.23 :: Float
+bulletVel = 0.90 :: Speed
+fireInterval = 0.23 :: Time
 accRate = 0.3 :: Float
-angularAcc = 3.0 :: Float
+angularAcc = 3.0 :: AngularSpeed

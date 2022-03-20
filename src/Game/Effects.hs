@@ -71,7 +71,7 @@ addExplosionParticle ::
     Vector2d -> -- The general direction it is travelling
     Vector2d -> -- A velocity offset to add to it
     Float ->    -- How focused the explosion is along its direction
-    Float ->    -- How long the particle should last
+    Time ->    -- How long the particle should last
     State GameState (Particle)
 addExplosionParticle time pos dir vel pw life = do
 
@@ -98,7 +98,7 @@ addExplosion ::
     Vector2d -> -- A velocity offset to add to it
     Int ->      -- The number of particles to spawn
     Float ->    -- How focused the explosion is along its direction
-    Float ->    -- How long the particle should last
+    Time ->    -- How long the particle should last
     State GameState ()
 addExplosion time pos dir vel n pw life = do
     particles <- replicateM n (addExplosionParticle time pos dir vel pw life)
@@ -109,9 +109,9 @@ addExplosion time pos dir vel n pw life = do
 
 -- Adds an exhaust particle to an engine
 addEngineParticle ::
-    Float ->     -- The lifetime of the particle
+    Time ->     -- The lifetime of the particle
     Thruster ->  -- The thruster to add it to
-    Float ->     -- The speed of the exhaust
+    Speed ->     -- The speed of the exhaust
     Position ->  -- The position of the player
     Direction -> -- The direction of the player
     Velocity ->  -- The velocity of the player

@@ -21,8 +21,8 @@ rndFloat min max = do
 
 -- Spawns new stars in the starfield
 spawnStars ::
-    Float -> -- The last time a star was spawned
-    Float -> -- The current time
+    Time -> -- The last time a star was spawned
+    Time -> -- The current time
     State IntroState ()
 spawnStars lastStar time = do
     state <- get
@@ -47,6 +47,17 @@ spawnStars lastStar time = do
 
 
 -- Runs one frame of the intro
+runIntroFrame :: State IntroState ()
+runIntroFrame = do
+    state <- get
+    spawnStars (is_lastStar state) (is_time state)
+    state <- get
+    put $ (onStars ((filter (\s ->  (is_time state) - (st_startTime s) < 10.0)))) state
+    
+    return ()
+
+
+-- Runs one frame of the intro, possibly changing the program state
 runFrame :: State ProgramState ()
 runFrame = do
     state <- get
@@ -61,15 +72,4 @@ runFrame = do
         state <- get
         put $ state { gls_mode = Playing }
 
-    return ()
-
-
--- Runs one frame of the intro
-runIntroFrame :: State IntroState ()
-runIntroFrame = do
-    state <- get
-    spawnStars (is_lastStar state) (is_time state)
-    state <- get
-    put $ (onStars ((filter (\s ->  (is_time state) - (st_startTime s) < 10.0)))) state
-    
     return ()

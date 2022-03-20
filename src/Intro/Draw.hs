@@ -34,10 +34,9 @@ drawStars particles time = do
 
 -- Draws the intro screen
 draw ::
-    GLFW.Window -> -- The window
     IntroState ->  -- The current state of the intro
     IO () 
-draw window introState = do
+draw introState = do
     clear [ColorBuffer]
 
     centerText 0.3 (Vector2d (-1.0) (-0.0)) (Vector2d 1.0 0.3) "Asteroids"

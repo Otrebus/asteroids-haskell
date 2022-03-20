@@ -73,6 +73,10 @@ type Velocity = Vector2d
 
 type Time = Float
 
+type Speed = Float
+
+type AngularSpeed = Float
+
 type Angle = Float
 
 idMatrix :: Matrix2d
@@ -155,7 +159,7 @@ rotate theta v = (Matrix2d(cos theta) (-sin(theta)) (sin theta) (cos theta))#*^v
 -- Returns the angle of the vector counterclockwise from the x axis
 angle ::
     Vector2d -> -- The vector
-    Float
+    Angle
 angle (Vector2d x y) = atan2 y x
 
 

@@ -63,7 +63,7 @@ data PlayerState = PlayerState {
     ps_position :: Position,
     ps_direction :: Direction,
     ps_velocity :: Velocity,
-    ps_angularVelocity :: Float,
+    ps_angularVelocity :: AngularSpeed,
     ps_thrusters :: Thrusters,
     ps_lastBullet :: Time,
     ps_aliveState :: AliveState
@@ -74,12 +74,12 @@ data Bullet = Bullet {
     b_position :: Position,
     b_direction :: Direction,
     b_velocity :: Velocity,
-    b_lifeTime :: Float
+    b_lifeTime :: Time
 } deriving (Show, Eq)
 
 
 data Asteroid = Asteroid {
-    a_angularVelocity :: Float,
+    a_angularVelocity :: AngularSpeed,
     a_velocity :: Velocity,
     a_vertices :: Vertices,
     a_splitEdge :: Maybe Edge
@@ -92,8 +92,8 @@ type SplitPolygon = (Vertices, Edge)
 data Particle = Particle {
     p_position :: Position,
     p_velocity :: Velocity,
-    p_timeStart :: Float,
-    p_lifeTime :: Float,
+    p_timeStart :: Time,
+    p_lifeTime :: Time,
     p_brightness :: Float
 } deriving (Show)
 
@@ -101,8 +101,8 @@ data Particle = Particle {
 data PolygonParticle = PolygonParticle {
     pp_vertices :: Vertices,
     pp_velocity :: Direction,
-    pp_angularVelocity :: Float,
-    pp_lifeTime :: Float
+    pp_angularVelocity :: AngularSpeed,
+    pp_lifeTime :: Time
 } deriving (Show)
 
 
@@ -112,8 +112,8 @@ data GameState = GameState {
     gs_polygonParticles :: [PolygonParticle],
     gs_bullets :: [Bullet],
     gs_asteroids :: [Asteroid],
-    gs_time :: Float,
-    gs_prevTime :: Float,
+    gs_time :: Time,
+    gs_prevTime :: Time,
     gs_score :: Float,
     gs_lives :: Int,
     gs_level :: Int,
@@ -126,14 +126,14 @@ data MenuState = MenuState {
 
 data Star = Star {
     st_pos :: Vector2d,
-    st_startTime :: Float
+    st_startTime :: Time
 } deriving Show
 
 data IntroState = IntroState {
-    is_time :: Float,
-    is_prevTime :: Float,
+    is_time :: Time,
+    is_prevTime :: Time,
     is_stars :: [Star],
-    is_lastStar :: Float,
+    is_lastStar :: Time,
     is_rng :: StdGen
 } deriving Show
 
