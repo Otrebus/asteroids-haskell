@@ -21,7 +21,7 @@ Some of these may be omitted if the corresponding libraries are already installe
 ## Screen capture
 ![Demo](demo.gif)
 
-(The above gif can be choppy depending on the browser used)
+(The above gif can be choppy depending on the browser used. [Here](https://www.youtube.com/watch?v=2_-TJjFk4VI) is a YouTube video.)
 
 ## Disclaimer
 Run at your own risk, program is fair-use etc.
